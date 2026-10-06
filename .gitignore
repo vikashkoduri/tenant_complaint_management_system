@@ -1,0 +1,35 @@
+# Maven
+target/
+*.war
+*.jar
+*.class
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment and Secrets
+.env
+*.properties.local
+
+# Uploads and Data
+uploads/
+logs/
+*.log
+
+# Selenium
+selenium-screenshots/
+
+# Ansible
+*.retry

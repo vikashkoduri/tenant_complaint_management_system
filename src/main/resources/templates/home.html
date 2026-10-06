@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tenant Complaint Management System</title>
+    <meta name="description" content="Submit and track property complaints easily. A comprehensive tenant complaint management system.">
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-brand">
+        &#127970; Tenant<span>CMS</span>
+    </a>
+    <ul class="navbar-nav">
+        <li><a th:href="@{/}">Home</a></li>
+        <li><a th:href="@{/complaints/submit}">Submit Complaint</a></li>
+        <li><a th:href="@{/complaints/track}">Track Complaint</a></li>
+        <li sec:authorize="isAuthenticated()"><a th:href="@{/reviewer/dashboard}">Dashboard</a></li>
+        <li sec:authorize="isAnonymous()"><a th:href="@{/login}">Reviewer Login</a></li>
+        <li sec:authorize="isAuthenticated()">
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn btn-sm btn-outline" style="color:#cbd5e1;border-color:#cbd5e1;">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="hero">
+        <h1>Tenant Complaint Management</h1>
+        <p>Submit, track, and resolve property complaints efficiently. Your voice matters — report issues and get them resolved.</p>
+        <div class="hero-actions">
+            <a th:href="@{/complaints/submit}" class="btn btn-primary btn-lg">&#128221; Submit Complaint</a>
+            <a th:href="@{/complaints/track}" class="btn btn-outline btn-lg" style="border-color:#fff;color:#fff;">&#128269; Track Complaint</a>
+        </div>
+    </div>
+
+    <div class="features-grid">
+        <div class="feature-card">
+            <div class="icon">&#128221;</div>
+            <h3>Easy Submission</h3>
+            <p>Submit complaints with detailed descriptions and supporting documents in just a few clicks.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">&#128269;</div>
+            <h3>Real-time Tracking</h3>
+            <p>Track your complaint status anytime using your unique reference ID and email.</p>
+        </div>
+        <div class="feature-card">
+            <div class="icon">&#9989;</div>
+            <h3>Quick Resolution</h3>
+            <p>Our review team processes complaints promptly with clear status updates and remarks.</p>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    <p>&copy; 2026 Tenant Complaint Management System. College DevOps Project.</p>
+</footer>
+
+</body>
+</html>

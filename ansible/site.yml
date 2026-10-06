@@ -1,0 +1,75 @@
+---
+- name: Deploy Tenant Complaint Management System
+  hosts: webservers
+  become: yes
+  vars:
+    docker_image: "your_dockerhub_user/tenant-complaint-management-system:latest"
+    container_name: "tenant_cms_app"
+    app_port: "8080"
+    env_file_path: "/opt/tenant_cms/.env"
+    upload_dir: "/opt/tenant_cms/uploads"
+
+  tasks:
+    - name: Ensure application directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0755'
+      loop:
+        - "/opt/tenant_cms"
+        - "{{ upload_dir }}"
+
+    - name: Ensure environment file exists (Placeholder)
+      # In a real environment, you'd template this with secure vault variables.
+      # For this college project, we ensure the file exists.
+      copy:
+        dest: "{{ env_file_path }}"
+        content: |
+          DB_HOST=db
+          DB_PORT=3306
+          DB_NAME=tenant_complaints
+          DB_USERNAME=root
+          DB_PASSWORD=root_password
+          UPLOAD_DIR=/app/uploads
+        mode: '0600'
+        force: no # Don't overwrite if it already exists
+
+    - name: Pull the latest Docker image
+      docker_image:
+        name: "{{ docker_image }}"
+        source: pull
+      register: image_pull
+
+    - name: Stop and remove the old container
+      docker_container:
+        name: "{{ container_name }}"
+        state: absent
+      when: image_pull.changed
+
+    - name: Start the new container
+      docker_container:
+        name: "{{ container_name }}"
+        image: "{{ docker_image }}"
+        state: started
+        restart_policy: unless-stopped
+        ports:
+          - "{{ app_port }}:8080"
+        env_file: "{{ env_file_path }}"
+        volumes:
+          - "{{ upload_dir }}:/app/uploads"
+
+    - name: Wait for application to become healthy
+      uri:
+        url: "http://localhost:{{ app_port }}/actuator/health"
+        status_code: 200
+        return_content: yes
+      register: result
+      until: result.status == 200
+      retries: 10
+      delay: 5
+      
+    - name: Verify Health Check Content
+      assert:
+        that:
+          - "'UP' in result.content"
+        fail_msg: "Application is running but health check did not return UP status."

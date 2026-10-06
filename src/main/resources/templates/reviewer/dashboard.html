@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reviewer Dashboard - TenantCMS</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
+    <ul class="navbar-nav">
+        <li><a th:href="@{/}">Home</a></li>
+        <li><a th:href="@{/reviewer/dashboard}" class="active">Dashboard</a></li>
+        <li>
+            <form th:action="@{/logout}" method="post" style="display:inline">
+                <button type="submit" class="btn btn-sm btn-outline" style="color:#cbd5e1;border-color:#cbd5e1;">Logout</button>
+            </form>
+        </li>
+    </ul>
+</nav>
+
+<div class="container">
+    <div class="page-header" style="margin-top:1rem;">
+        <h1>&#128202; Reviewer Dashboard</h1>
+        <p>Welcome, <span sec:authentication="name">reviewer</span></p>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-value" th:text="${stats['total']}">0</div>
+            <div class="stat-label">Total</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#2563eb;" th:text="${stats['submitted']}">0</div>
+            <div class="stat-label">Submitted</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#f59e0b;" th:text="${stats['underReview']}">0</div>
+            <div class="stat-label">Under Review</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#10b981;" th:text="${stats['approved']}">0</div>
+            <div class="stat-label">Approved</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#ef4444;" th:text="${stats['rejected']}">0</div>
+            <div class="stat-label">Rejected</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-value" style="color:#9d174d;" th:text="${stats['actionRequired']}">0</div>
+            <div class="stat-label">Action Req.</div>
+        </div>
+    </div>
+
+    <!-- Search and Filter -->
+    <div class="card">
+        <div class="card-header">
+            All Complaints
+        </div>
+        <div class="card-body">
+            <div class="filter-bar">
+                <form th:action="@{/reviewer/dashboard}" method="get" style="display:flex;gap:0.75rem;flex-wrap:wrap;align-items:center;">
+                    <input type="text" name="search" class="form-control" placeholder="Search by name or ID..."
+                           th:value="${search}" style="max-width:250px;">
+                    <select name="status" class="form-control" style="max-width:180px;">
+                        <option value="">All Statuses</option>
+                        <option th:each="s : ${statuses}" th:value="${s}" th:text="${s.displayName}"
+                                th:selected="${selectedStatus != null and selectedStatus == s}"></option>
+                    </select>
+                    <button type="submit" class="btn btn-primary btn-sm">Filter</button>
+                    <a th:href="@{/reviewer/dashboard}" class="btn btn-outline btn-sm">Clear</a>
+                </form>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Reference ID</th>
+                            <th>Tenant</th>
+                            <th>Category</th>
+                            <th>Priority</th>
+                            <th>Status</th>
+                            <th>Submitted</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr th:each="c : ${complaints}">
+                            <td style="font-weight:600;" th:text="${c.referenceId}"></td>
+                            <td th:text="${c.tenantName}"></td>
+                            <td th:text="${c.category.displayName}"></td>
+                            <td>
+                                <span th:class="'priority-' + ${c.priority.name().toLowerCase()}"
+                                      th:text="${c.priority.displayName}"></span>
+                            </td>
+                            <td>
+                                <span th:class="'badge badge-' + ${c.status.name().toLowerCase().replace('_', '-')}"
+                                      th:text="${c.status.displayName}"></span>
+                            </td>
+                            <td th:text="${#temporals.format(c.createdAt, 'dd MMM yyyy')}"></td>
+                            <td>
+                                <a th:href="@{/reviewer/complaint/{id}(id=${c.id})}" class="btn btn-primary btn-sm">View</a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(complaints)}">
+                            <td colspan="7" style="text-align:center;color:var(--text-muted);padding:2rem;">
+                                No complaints found.
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    <p>&copy; 2026 Tenant Complaint Management System.</p>
+</footer>
+
+</body>
+</html>

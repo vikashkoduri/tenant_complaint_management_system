@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Complaint Submitted - TenantCMS</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
+    <ul class="navbar-nav">
+        <li><a th:href="@{/}">Home</a></li>
+        <li><a th:href="@{/complaints/submit}">Submit Complaint</a></li>
+        <li><a th:href="@{/complaints/track}">Track Complaint</a></li>
+        <li><a th:href="@{/login}">Reviewer Login</a></li>
+    </ul>
+</nav>
+
+<div class="container-sm" style="margin-top:3rem;">
+    <div class="card" style="text-align:center;">
+        <div class="card-body" style="padding:3rem;">
+            <div class="success-icon">&#10004;</div>
+            <h1 style="color:var(--success);margin-bottom:0.5rem;">Complaint Submitted Successfully!</h1>
+            <p style="color:var(--text-muted);margin-bottom:2rem;">Your complaint has been registered and will be reviewed shortly.</p>
+
+            <div class="card" style="max-width:400px;margin:0 auto 2rem;text-align:left;">
+                <div class="card-body">
+                    <div class="detail-item">
+                        <div class="label">Reference ID</div>
+                        <div class="value" style="font-size:1.25rem;font-weight:700;color:var(--primary);"
+                             th:text="${complaint.referenceId}">COMP-20261006-00001</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Title</div>
+                        <div class="value" th:text="${complaint.title}">Complaint Title</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Category</div>
+                        <div class="value" th:text="${complaint.category.displayName}">Category</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Status</div>
+                        <div class="value"><span class="badge badge-submitted">SUBMITTED</span></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="alert alert-info" style="text-align:left;">
+                <strong>Important:</strong> Please save your Reference ID <strong th:text="${complaint.referenceId}"></strong>
+                — you will need it to track your complaint status.
+            </div>
+
+            <div style="display:flex;gap:1rem;justify-content:center;margin-top:1.5rem;">
+                <a th:href="@{/complaints/track}" class="btn btn-primary">&#128269; Track Complaint</a>
+                <a th:href="@{/complaints/submit}" class="btn btn-outline">&#128221; Submit Another</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    <p>&copy; 2026 Tenant Complaint Management System.</p>
+</footer>
+
+</body>
+</html>

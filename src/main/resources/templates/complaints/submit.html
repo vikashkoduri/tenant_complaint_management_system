@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Submit Complaint - TenantCMS</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
+    <ul class="navbar-nav">
+        <li><a th:href="@{/}">Home</a></li>
+        <li><a th:href="@{/complaints/submit}" class="active">Submit Complaint</a></li>
+        <li><a th:href="@{/complaints/track}">Track Complaint</a></li>
+        <li><a th:href="@{/login}">Reviewer Login</a></li>
+    </ul>
+</nav>
+
+<div class="container-sm">
+    <div class="page-header" style="margin-top:1rem;">
+        <h1>&#128221; Submit a Complaint</h1>
+        <p>Fill in the details below to submit your complaint. Fields marked with * are required.</p>
+    </div>
+
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+    <div th:if="${fileError}" class="alert alert-warning" th:text="${fileError}"></div>
+
+    <div class="card">
+        <div class="card-header">Complaint Details</div>
+        <div class="card-body">
+            <form th:action="@{/complaints/submit}" th:object="${complaintDTO}" method="post" enctype="multipart/form-data">
+
+                <!-- Tenant Info -->
+                <h3 style="margin-bottom:1rem;color:var(--secondary);">Personal Information</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="tenantName">Full Name <span class="required">*</span></label>
+                        <input type="text" id="tenantName" th:field="*{tenantName}" class="form-control"
+                               th:classappend="${#fields.hasErrors('tenantName')} ? 'error' : ''"
+                               placeholder="Enter your full name">
+                        <div th:if="${#fields.hasErrors('tenantName')}" class="form-error" th:errors="*{tenantName}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="email">Email Address <span class="required">*</span></label>
+                        <input type="email" id="email" th:field="*{email}" class="form-control"
+                               th:classappend="${#fields.hasErrors('email')} ? 'error' : ''"
+                               placeholder="your@email.com">
+                        <div th:if="${#fields.hasErrors('email')}" class="form-error" th:errors="*{email}"></div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number <span class="required">*</span></label>
+                        <input type="tel" id="phoneNumber" th:field="*{phoneNumber}" class="form-control"
+                               th:classappend="${#fields.hasErrors('phoneNumber')} ? 'error' : ''"
+                               placeholder="+91 9876543210">
+                        <div th:if="${#fields.hasErrors('phoneNumber')}" class="form-error" th:errors="*{phoneNumber}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="propertyInfo">Property / Flat / Room <span class="required">*</span></label>
+                        <input type="text" id="propertyInfo" th:field="*{propertyInfo}" class="form-control"
+                               th:classappend="${#fields.hasErrors('propertyInfo')} ? 'error' : ''"
+                               placeholder="e.g., Flat 302, Block A">
+                        <div th:if="${#fields.hasErrors('propertyInfo')}" class="form-error" th:errors="*{propertyInfo}"></div>
+                    </div>
+                </div>
+
+                <hr style="margin:1.5rem 0;border-color:var(--border);">
+
+                <!-- Complaint Info -->
+                <h3 style="margin-bottom:1rem;color:var(--secondary);">Complaint Information</h3>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="category">Category <span class="required">*</span></label>
+                        <select id="category" th:field="*{category}" class="form-control"
+                                th:classappend="${#fields.hasErrors('category')} ? 'error' : ''">
+                            <option value="">-- Select Category --</option>
+                            <option th:each="cat : ${categories}" th:value="${cat}" th:text="${cat.displayName}"></option>
+                        </select>
+                        <div th:if="${#fields.hasErrors('category')}" class="form-error" th:errors="*{category}"></div>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority <span class="required">*</span></label>
+                        <select id="priority" th:field="*{priority}" class="form-control"
+                                th:classappend="${#fields.hasErrors('priority')} ? 'error' : ''">
+                            <option value="">-- Select Priority --</option>
+                            <option th:each="p : ${priorities}" th:value="${p}" th:text="${p.displayName}"></option>
+                        </select>
+                        <div th:if="${#fields.hasErrors('priority')}" class="form-error" th:errors="*{priority}"></div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="title">Complaint Title <span class="required">*</span></label>
+                    <input type="text" id="title" th:field="*{title}" class="form-control"
+                           th:classappend="${#fields.hasErrors('title')} ? 'error' : ''"
+                           placeholder="Brief title for your complaint">
+                    <div th:if="${#fields.hasErrors('title')}" class="form-error" th:errors="*{title}"></div>
+                </div>
+
+                <div class="form-group">
+                    <label for="description">Description <span class="required">*</span></label>
+                    <textarea id="description" th:field="*{description}" class="form-control" rows="5"
+                              th:classappend="${#fields.hasErrors('description')} ? 'error' : ''"
+                              placeholder="Describe the issue in detail (minimum 20 characters)"></textarea>
+                    <div th:if="${#fields.hasErrors('description')}" class="form-error" th:errors="*{description}"></div>
+                    <div class="form-hint">Minimum 20, maximum 2000 characters</div>
+                </div>
+
+                <div class="form-group">
+                    <label for="document">Supporting Document (Optional)</label>
+                    <input type="file" id="document" name="document" class="form-control"
+                           accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx">
+                    <div class="form-hint">Allowed: PDF, JPEG, PNG, GIF, DOC, DOCX. Max size: 5MB</div>
+                </div>
+
+                <div style="margin-top:1.5rem;">
+                    <button type="submit" class="btn btn-primary btn-lg">&#128228; Submit Complaint</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<footer class="footer">
+    <p>&copy; 2026 Tenant Complaint Management System.</p>
+</footer>
+
+</body>
+</html>

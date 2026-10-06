@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Error - TenantCMS</title>
+    <link rel="stylesheet" th:href="@{/css/style.css}">
+</head>
+<body>
+<nav class="navbar">
+    <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
+    <ul class="navbar-nav">
+        <li><a th:href="@{/}">Home</a></li>
+    </ul>
+</nav>
+<div class="container-sm" style="text-align:center;margin-top:4rem;">
+    <h1 style="font-size:4rem;color:var(--danger);">Error</h1>
+    <h2>Something Went Wrong</h2>
+    <p style="color:var(--text-muted);margin:1rem 0;" th:text="${errorMessage != null ? errorMessage : 'An unexpected error occurred. Please try again.'}"></p>
+    <a th:href="@{/}" class="btn btn-primary">Go Home</a>
+</div>
+</body>
+</html>
