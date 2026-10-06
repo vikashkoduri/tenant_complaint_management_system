@@ -45,7 +45,7 @@ public class SeleniumTest {
 
         wait = new WebDriverWait(
                 driver,
-                Duration.ofSeconds(15)
+                Duration.ofSeconds(20)
         );
     }
 
@@ -73,9 +73,14 @@ public class SeleniumTest {
 
             Files.createDirectories(targetDir);
 
+            Path target =
+                    targetDir.resolve(name + ".png");
+
+            Files.deleteIfExists(target);
+
             Files.copy(
                     screenshot.toPath(),
-                    targetDir.resolve(name + ".png")
+                    target
             );
 
         } catch (IOException e) {
@@ -89,7 +94,9 @@ public class SeleniumTest {
 
     private void loginAsReviewer() {
 
-        driver.get(baseUrl + "/login");
+        driver.get(
+                baseUrl + "/login"
+        );
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -97,20 +104,32 @@ public class SeleniumTest {
                 )
         );
 
-        driver.findElement(By.id("username"))
-                .clear();
+        WebElement username =
+                driver.findElement(
+                        By.id("username")
+                );
 
-        driver.findElement(By.id("username"))
-                .sendKeys("admin@tenant.com");
+        username.clear();
 
-        driver.findElement(By.id("password"))
-                .clear();
+        username.sendKeys(
+                "admin@tenant.com"
+        );
 
-        driver.findElement(By.id("password"))
-                .sendKeys("admin123");
+        WebElement password =
+                driver.findElement(
+                        By.id("password")
+                );
+
+        password.clear();
+
+        password.sendKeys(
+                "admin123"
+        );
 
         driver.findElement(
-                By.cssSelector("button[type='submit']")
+                By.cssSelector(
+                        "button[type='submit']"
+                )
         ).click();
 
         wait.until(
@@ -118,9 +137,20 @@ public class SeleniumTest {
                         "/reviewer/dashboard"
                 )
         );
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
+                )
+        );
     }
 
     private WebElement findComplaintRow() {
+
+        assertNotNull(
+                submittedReferenceId,
+                "Submitted complaint reference ID must exist"
+        );
 
         return wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -133,63 +163,172 @@ public class SeleniumTest {
         );
     }
 
-    private WebElement findStatusSelect() {
+    private WebElement findStatusSelectInRow(
+            WebElement row
+    ) {
 
-        return wait.until(
-                ExpectedConditions.presenceOfElementLocated(
-                        By.xpath(
-                                "//select[" +
-                                        ".//option[" +
-                                        "normalize-space()='Under Review'" +
-                                        "]" +
-                                        " and " +
-                                        ".//option[" +
-                                        "normalize-space()='Approved'" +
-                                        "]" +
-                                        " and " +
-                                        ".//option[" +
-                                        "normalize-space()='Rejected'" +
-                                        "]" +
-                                        "]"
-                        )
-                )
-        );
-    }
-
-    private void openComplaintForReview() {
-
-        WebElement row = findComplaintRow();
-
-        WebElement actionLink = null;
+        String statusXPath =
+                ".//select[" +
+                        ".//option[" +
+                        "normalize-space()='Under Review'" +
+                        "]" +
+                        " and " +
+                        ".//option[" +
+                        "normalize-space()='Approved'" +
+                        "]" +
+                        " and " +
+                        ".//option[" +
+                        "normalize-space()='Rejected'" +
+                        "]" +
+                        "]";
 
         try {
 
-            actionLink = row.findElement(
+            return row.findElement(
+                    By.xpath(statusXPath)
+            );
+
+        } catch (NoSuchElementException ignored) {
+
+            return null;
+        }
+    }
+
+    private WebElement findStatusSelectOnPage() {
+
+        String statusXPath =
+                "//select[" +
+                        ".//option[" +
+                        "normalize-space()='Under Review'" +
+                        "]" +
+                        " and " +
+                        ".//option[" +
+                        "normalize-space()='Approved'" +
+                        "]" +
+                        " and " +
+                        ".//option[" +
+                        "normalize-space()='Rejected'" +
+                        "]" +
+                        "]";
+
+        try {
+
+            return driver.findElement(
+                    By.xpath(statusXPath)
+            );
+
+        } catch (NoSuchElementException ignored) {
+
+            return null;
+        }
+    }
+
+    private WebElement findStatusSelect() {
+
+        WebElement statusSelect =
+                findStatusSelectOnPage();
+
+        if (statusSelect != null) {
+            return statusSelect;
+        }
+
+        if (submittedReferenceId != null) {
+
+            try {
+
+                WebElement row =
+                        findComplaintRow();
+
+                statusSelect =
+                        findStatusSelectInRow(row);
+
+                if (statusSelect != null) {
+                    return statusSelect;
+                }
+
+            } catch (Exception ignored) {
+            }
+        }
+
+        fail(
+                "Could not find reviewer status dropdown containing " +
+                        "Under Review, Approved and Rejected. " +
+                        "Current URL: " +
+                        driver.getCurrentUrl()
+        );
+
+        return null;
+    }
+
+    private WebElement findSubmitButtonForStatus(
+            WebElement statusSelect
+    ) {
+
+        try {
+
+            WebElement form =
+                    statusSelect.findElement(
+                            By.xpath(
+                                    "./ancestor::form[1]"
+                            )
+                    );
+
+            try {
+
+                return form.findElement(
+                        By.cssSelector(
+                                "button[type='submit']"
+                        )
+                );
+
+            } catch (NoSuchElementException ignored) {
+            }
+
+            try {
+
+                return form.findElement(
+                        By.cssSelector(
+                                "input[type='submit']"
+                        )
+                );
+
+            } catch (NoSuchElementException ignored) {
+            }
+
+        } catch (NoSuchElementException ignored) {
+        }
+
+        WebElement row = null;
+
+        try {
+
+            row = statusSelect.findElement(
                     By.xpath(
-                            ".//a[contains(" +
-                                    "translate(normalize-space(.)," +
-                                    "'ABCDEFGHIJKLMNOPQRSTUVWXYZ'," +
-                                    "'abcdefghijklmnopqrstuvwxyz')," +
-                                    "'view'" +
-                                    ")]"
+                            "./ancestor::tr[1]"
                     )
             );
 
         } catch (NoSuchElementException ignored) {
         }
 
-        if (actionLink == null) {
+        if (row != null) {
 
             try {
 
-                actionLink = row.findElement(
-                        By.xpath(
-                                ".//a[contains(" +
-                                        "translate(normalize-space(.)," +
-                                        "'ABCDEFGHIJKLMNOPQRSTUVWXYZ'," +
-                                        "'abcdefghijklmnopqrstuvwxyz')," +
-                                        "'review'" +
-                                        ")]"
+                return row.findElement(
+                        By.cssSelector(
+                                "button[type='submit']"
+                        )
+                );
+
+            } catch (NoSuchElementException ignored) {
+            }
+
+            try {
+
+                return row.findElement(
+                        By.cssSelector(
+                                "input[type='submit']"
                         )
                 );
 
@@ -197,178 +336,57 @@ public class SeleniumTest {
             }
         }
 
-        if (actionLink == null) {
+        try {
 
-            try {
+            return driver.findElement(
+                    By.cssSelector(
+                            "button[type='submit']"
+                    )
+            );
 
-                actionLink = row.findElement(
-                        By.xpath(
-                                ".//a[contains(" +
-                                        "translate(normalize-space(.)," +
-                                        "'ABCDEFGHIJKLMNOPQRSTUVWXYZ'," +
-                                        "'abcdefghijklmnopqrstuvwxyz')," +
-                                        "'edit'" +
-                                        ")]"
-                        )
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
+        } catch (NoSuchElementException ignored) {
         }
 
-        if (actionLink == null) {
+        try {
 
-            try {
+            return driver.findElement(
+                    By.cssSelector(
+                            "input[type='submit']"
+                    )
+            );
 
-                actionLink = row.findElement(
-                        By.cssSelector("a.btn")
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
+        } catch (NoSuchElementException ignored) {
         }
 
-        if (actionLink == null) {
-
-            try {
-
-                actionLink = row.findElement(
-                        By.cssSelector("button")
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        assertNotNull(
-                actionLink,
-                "Complaint action button/link should be available"
+        fail(
+                "Could not find submit button for reviewer status update"
         );
 
-        wait.until(
-                ExpectedConditions.elementToBeClickable(
-                        actionLink
-                )
-        );
-
-        actionLink.click();
-
-        wait.until(
-                ExpectedConditions.or(
-                        ExpectedConditions.presenceOfElementLocated(
-                                By.xpath(
-                                        "//select[" +
-                                                ".//option[" +
-                                                "normalize-space()='Under Review'" +
-                                                "]" +
-                                                " and " +
-                                                ".//option[" +
-                                                "normalize-space()='Approved'" +
-                                                "]" +
-                                                " and " +
-                                                ".//option[" +
-                                                "normalize-space()='Rejected'" +
-                                                "]" +
-                                                "]"
-                                )
-                        ),
-                        ExpectedConditions.presenceOfElementLocated(
-                                By.cssSelector("form")
-                        )
-                )
-        );
-    }
-
-    private void selectStatus(String status) {
-
-        WebElement statusSelect =
-                findStatusSelect();
-
-        Select select =
-                new Select(statusSelect);
-
-        select.selectByVisibleText(status);
-
-        String selectedText =
-                select.getFirstSelectedOption()
-                        .getText()
-                        .trim();
-
-        assertEquals(
-                status,
-                selectedText,
-                "Selected complaint status should be "
-                        + status
-        );
+        return null;
     }
 
     private void enterRemarks(String remarks) {
 
+        WebElement remarksField = null;
+
         try {
 
-            WebElement remarksField =
+            remarksField =
                     driver.findElement(
                             By.id("remarks")
                     );
 
-            remarksField.clear();
-            remarksField.sendKeys(remarks);
-
-            return;
-
         } catch (NoSuchElementException ignored) {
         }
 
-        try {
-
-            WebElement textarea =
-                    driver.findElement(
-                            By.cssSelector("textarea")
-                    );
-
-            textarea.clear();
-            textarea.sendKeys(remarks);
-
-        } catch (NoSuchElementException ignored) {
-
-            System.out.println(
-                    "Remarks field not available; continuing."
-            );
-        }
-    }
-
-    private void submitStatusForm() {
-
-        WebElement statusSelect =
-                findStatusSelect();
-
-        WebElement form =
-                statusSelect.findElement(
-                        By.xpath("./ancestor::form[1]")
-                );
-
-        WebElement submitButton = null;
-
-        try {
-
-            submitButton =
-                    form.findElement(
-                            By.cssSelector(
-                                    "button[type='submit']"
-                            )
-                    );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        if (submitButton == null) {
+        if (remarksField == null) {
 
             try {
 
-                submitButton =
-                        form.findElement(
+                remarksField =
+                        driver.findElement(
                                 By.cssSelector(
-                                        "input[type='submit']"
+                                        "textarea[name='remarks']"
                                 )
                         );
 
@@ -376,10 +394,67 @@ public class SeleniumTest {
             }
         }
 
-        assertNotNull(
-                submitButton,
-                "Status update submit button should be available"
+        if (remarksField == null) {
+
+            try {
+
+                remarksField =
+                        driver.findElement(
+                                By.cssSelector(
+                                        "textarea"
+                                )
+                        );
+
+            } catch (NoSuchElementException ignored) {
+            }
+        }
+
+        if (remarksField != null) {
+
+            remarksField.clear();
+
+            remarksField.sendKeys(
+                    remarks
+            );
+        }
+    }
+
+    private void selectStatus(
+            String status
+    ) {
+
+        WebElement statusSelect =
+                findStatusSelect();
+
+        Select select =
+                new Select(statusSelect);
+
+        select.selectByVisibleText(
+                status
         );
+
+        String selected =
+                select.getFirstSelectedOption()
+                        .getText()
+                        .trim();
+
+        assertEquals(
+                status,
+                selected,
+                "Reviewer should be able to select "
+                        + status
+        );
+    }
+
+    private void submitStatusUpdate() {
+
+        WebElement statusSelect =
+                findStatusSelect();
+
+        WebElement submitButton =
+                findSubmitButtonForStatus(
+                        statusSelect
+                );
 
         wait.until(
                 ExpectedConditions.elementToBeClickable(
@@ -390,17 +465,91 @@ public class SeleniumTest {
         submitButton.click();
 
         wait.until(
-                ExpectedConditions.or(
-                        ExpectedConditions.presenceOfElementLocated(
-                                By.cssSelector(".alert-success")
-                        ),
-                        ExpectedConditions.textToBePresentInElementLocated(
-                                By.tagName("body"),
-                                "successfully"
-                        ),
-                        ExpectedConditions.urlContains(
-                                "/reviewer"
-                        )
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
+                )
+        );
+
+        try {
+
+            Thread.sleep(1000);
+
+        } catch (InterruptedException e) {
+
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void openComplaintDetails() {
+
+        WebElement row =
+                findComplaintRow();
+
+        WebElement action = null;
+
+        try {
+
+            action =
+                    row.findElement(
+                            By.xpath(
+                                    ".//a[contains(" +
+                                            "translate(normalize-space(.)," +
+                                            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ'," +
+                                            "'abcdefghijklmnopqrstuvwxyz')," +
+                                            "'view'" +
+                                            ")]"
+                            )
+                    );
+
+        } catch (NoSuchElementException ignored) {
+        }
+
+        if (action == null) {
+
+            try {
+
+                action =
+                        row.findElement(
+                                By.cssSelector(
+                                        "a.btn"
+                                )
+                        );
+
+            } catch (NoSuchElementException ignored) {
+            }
+        }
+
+        if (action == null) {
+
+            try {
+
+                action =
+                        row.findElement(
+                                By.cssSelector(
+                                        "button"
+                                )
+                        );
+
+            } catch (NoSuchElementException ignored) {
+            }
+        }
+
+        assertNotNull(
+                action,
+                "Complaint view/action button should exist"
+        );
+
+        wait.until(
+                ExpectedConditions.elementToBeClickable(
+                        action
+                )
+        );
+
+        action.click();
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
                 )
         );
     }
@@ -426,7 +575,9 @@ public class SeleniumTest {
 
             driver.findElement(
                     By.id("tenantName")
-            ).sendKeys("John Doe");
+            ).sendKeys(
+                    "John Doe"
+            );
 
             driver.findElement(
                     By.id("email")
@@ -500,28 +651,25 @@ public class SeleniumTest {
                     refElement.getText().trim();
 
             assertNotNull(
-                    submittedReferenceId,
-                    "Reference ID should not be null"
+                    submittedReferenceId
             );
 
             assertFalse(
-                    submittedReferenceId.isEmpty(),
-                    "Reference ID should not be empty"
+                    submittedReferenceId.isEmpty()
             );
 
             assertTrue(
-                    submittedReferenceId.startsWith("COMP-"),
+                    submittedReferenceId.startsWith(
+                            "COMP-"
+                    ),
                     "Reference ID should start with COMP-"
             );
 
-            String pageSource =
-                    driver.getPageSource();
-
             assertTrue(
-                    pageSource.contains(
+                    driver.getPageSource().contains(
                             "Complaint Submitted Successfully"
                     ),
-                    "Success message should be displayed"
+                    "Complaint success message should appear"
             );
 
             takeScreenshot(
@@ -614,8 +762,7 @@ public class SeleniumTest {
         try {
 
             assertNotNull(
-                    submittedReferenceId,
-                    "Reference ID from Test 1 must be available"
+                    submittedReferenceId
             );
 
             driver.get(
@@ -654,19 +801,19 @@ public class SeleniumTest {
                     )
             );
 
-            String pageSource =
+            String page =
                     driver.getPageSource();
 
             assertTrue(
-                    pageSource.contains(
+                    page.contains(
                             submittedReferenceId
                     ),
                     "Reference ID should be displayed"
             );
 
             assertTrue(
-                    pageSource.contains("SUBMITTED")
-                            || pageSource.contains("Submitted"),
+                    page.contains("SUBMITTED")
+                            || page.contains("Submitted"),
                     "Submitted status should be displayed"
             );
 
@@ -694,24 +841,23 @@ public class SeleniumTest {
         try {
 
             assertNotNull(
-                    submittedReferenceId,
-                    "Reference ID from Test 1 must be available"
+                    submittedReferenceId
             );
 
             loginAsReviewer();
 
-            String pageSource =
+            String page =
                     driver.getPageSource();
 
             assertTrue(
-                    pageSource.contains(
+                    page.contains(
                             "Reviewer Dashboard"
                     ),
                     "Reviewer Dashboard should be visible"
             );
 
             assertTrue(
-                    pageSource.contains(
+                    page.contains(
                             submittedReferenceId
                     ),
                     "Submitted complaint should be listed"
@@ -727,7 +873,7 @@ public class SeleniumTest {
                     "Correct complaint row should be displayed"
             );
 
-            openComplaintForReview();
+            openComplaintDetails();
 
             wait.until(
                     ExpectedConditions.presenceOfElementLocated(
@@ -737,14 +883,14 @@ public class SeleniumTest {
                     )
             );
 
-            String detailsPage =
+            String details =
                     driver.getPageSource();
 
             assertTrue(
-                    detailsPage.contains(
+                    details.contains(
                             submittedReferenceId
                     )
-                            || detailsPage.contains(
+                            || details.contains(
                             "Water leak in bathroom ceiling"
                     ),
                     "Complaint details should be shown"
@@ -775,31 +921,60 @@ public class SeleniumTest {
 
             assertNotNull(
                     submittedReferenceId,
-                    "Reference ID from Test 1 must be available"
+                    "Reference ID must be available"
             );
+
+            /*
+             * IMPORTANT:
+             *
+             * The previous version clicked the complaint View button
+             * and then searched for the status dropdown.
+             *
+             * Jenkins proved that the View page does NOT contain
+             * the status dropdown.
+             *
+             * Therefore this test works directly from the
+             * Reviewer Dashboard and searches the exact complaint row
+             * for the status control.
+             */
 
             loginAsReviewer();
 
-            findComplaintRow();
+            WebElement row =
+                    findComplaintRow();
 
-            openComplaintForReview();
+            assertTrue(
+                    row.getText().contains(
+                            submittedReferenceId
+                    ),
+                    "Correct complaint must be selected"
+            );
 
             WebElement statusSelect =
-                    findStatusSelect();
+                    findStatusSelectInRow(row);
+
+            /*
+             * If the status dropdown is present directly
+             * in the complaint row, use it.
+             */
+            if (statusSelect == null) {
+
+                statusSelect =
+                        findStatusSelectOnPage();
+            }
 
             assertNotNull(
                     statusSelect,
-                    "Reviewer status dropdown should exist"
+                    "Reviewer status dropdown with Under Review, "
+                            + "Approved and Rejected options must exist"
             );
 
-            Select statusDropdown =
+            Select dropdown =
                     new Select(statusSelect);
 
-            var options =
-                    statusDropdown.getOptions();
-
             assertTrue(
-                    options.stream()
+                    dropdown.getOptions()
+                            .stream()
                             .anyMatch(
                                     option ->
                                             option.getText()
@@ -812,7 +987,8 @@ public class SeleniumTest {
             );
 
             assertTrue(
-                    options.stream()
+                    dropdown.getOptions()
+                            .stream()
                             .anyMatch(
                                     option ->
                                             option.getText()
@@ -825,7 +1001,8 @@ public class SeleniumTest {
             );
 
             assertTrue(
-                    options.stream()
+                    dropdown.getOptions()
+                            .stream()
                             .anyMatch(
                                     option ->
                                             option.getText()
@@ -837,56 +1014,181 @@ public class SeleniumTest {
                     "Rejected option should exist"
             );
 
-            selectStatus(
+            /*
+             * STEP 1:
+             * Submitted -> Under Review
+             */
+            dropdown.selectByVisibleText(
                     "Under Review"
+            );
+
+            assertEquals(
+                    "Under Review",
+                    dropdown.getFirstSelectedOption()
+                            .getText()
+                            .trim(),
+                    "Status should be Under Review"
             );
 
             enterRemarks(
                     "Taking this complaint for review"
             );
 
-            submitStatusForm();
+            WebElement submitButton =
+                    findSubmitButtonForStatus(
+                            statusSelect
+                    );
+
+            wait.until(
+                    ExpectedConditions.elementToBeClickable(
+                            submitButton
+                    )
+            );
+
+            submitButton.click();
+
+            try {
+
+                Thread.sleep(1200);
+
+            } catch (InterruptedException e) {
+
+                Thread.currentThread().interrupt();
+            }
 
             takeScreenshot(
                     "test5_under_review"
             );
 
+            /*
+             * STEP 2:
+             * Return to dashboard.
+             */
             driver.get(
-                    baseUrl
-                            + "/reviewer/dashboard"
+                    baseUrl + "/reviewer/dashboard"
             );
 
-            findComplaintRow();
+            wait.until(
+                    ExpectedConditions.urlContains(
+                            "/reviewer/dashboard"
+                    )
+            );
 
-            openComplaintForReview();
+            WebElement rowAfterReview =
+                    findComplaintRow();
 
-            findStatusSelect();
+            assertTrue(
+                    rowAfterReview.getText().contains(
+                            submittedReferenceId
+                    ),
+                    "Complaint should remain on reviewer dashboard"
+            );
 
-            selectStatus(
+            /*
+             * STEP 3:
+             * Find the status dropdown again.
+             */
+            WebElement approvedStatus =
+                    findStatusSelectInRow(
+                            rowAfterReview
+                    );
+
+            if (approvedStatus == null) {
+
+                approvedStatus =
+                        findStatusSelectOnPage();
+            }
+
+            assertNotNull(
+                    approvedStatus,
+                    "Status dropdown should be available "
+                            + "after Under Review update"
+            );
+
+            Select approvedDropdown =
+                    new Select(
+                            approvedStatus
+                    );
+
+            /*
+             * STEP 4:
+             * Under Review -> Approved
+             */
+            approvedDropdown.selectByVisibleText(
                     "Approved"
+            );
+
+            assertEquals(
+                    "Approved",
+                    approvedDropdown
+                            .getFirstSelectedOption()
+                            .getText()
+                            .trim(),
+                    "Status should be Approved"
             );
 
             enterRemarks(
                     "Issue has been resolved. Approving complaint."
             );
 
-            submitStatusForm();
+            WebElement approveButton =
+                    findSubmitButtonForStatus(
+                            approvedStatus
+                    );
+
+            wait.until(
+                    ExpectedConditions.elementToBeClickable(
+                            approveButton
+                    )
+            );
+
+            approveButton.click();
+
+            try {
+
+                Thread.sleep(1500);
+
+            } catch (InterruptedException e) {
+
+                Thread.currentThread().interrupt();
+            }
 
             takeScreenshot(
                     "test5_approve_success"
             );
 
-            String finalPage =
-                    driver.getPageSource();
+            /*
+             * STEP 5:
+             * Verify the final status from the dashboard.
+             */
+            driver.get(
+                    baseUrl + "/reviewer/dashboard"
+            );
+
+            wait.until(
+                    ExpectedConditions.urlContains(
+                            "/reviewer/dashboard"
+                    )
+            );
+
+            WebElement finalRow =
+                    findComplaintRow();
+
+            String finalRowText =
+                    finalRow.getText();
 
             assertTrue(
-                    finalPage.contains(
+                    finalRowText.contains(
                             "Approved"
                     )
-                            || finalPage.contains(
+                            || finalRowText.contains(
                             "APPROVED"
                     ),
-                    "Complaint should show Approved status"
+                    "Complaint should finally show Approved status"
+            );
+
+            takeScreenshot(
+                    "test5_final_approved"
             );
 
         } catch (Exception e) {
