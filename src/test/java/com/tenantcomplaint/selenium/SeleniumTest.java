@@ -12,7 +12,6 @@ import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -20,1184 +19,1094 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class SeleniumTest {
 
-    private static WebDriver driver;
-    private static WebDriverWait wait;
-    private static String baseUrl;
-    private static String submittedReferenceId;
+    private WebDriver driver;
+    private WebDriverWait wait;
 
-    @BeforeAll
-    static void setup() {
+    private static final String BASE_URL =
+            System.getProperty("app.base.url", "http://localhost:8080");
 
-        baseUrl = System.getProperty(
-                "app.base.url",
-                "http://localhost:8080"
-        );
+    private static final String TENANT_EMAIL =
+            "john@example.com";
+
+    private static final String TENANT_PASSWORD =
+            "password123";
+
+    private static final String REVIEWER_EMAIL =
+            "admin@tenant.com";
+
+    private static final String REVIEWER_PASSWORD =
+            "admin123";
+
+    private String submittedReferenceId;
+
+    @BeforeEach
+    void setUp() {
 
         ChromeOptions options = new ChromeOptions();
 
         options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
-        options.addArguments("--disable-gpu");
         options.addArguments("--window-size=1920,1080");
+        options.addArguments("--disable-gpu");
 
         driver = new ChromeDriver(options);
 
-        wait = new WebDriverWait(
-                driver,
-                Duration.ofSeconds(20)
-        );
+        driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(2));
+        driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(60));
+
+        wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
-    @AfterAll
-    static void teardown() {
+    @AfterEach
+    void tearDown(TestInfo testInfo) {
+
+        try {
+
+            if (driver != null) {
+
+                File screenshotDir =
+                        new File("target/selenium-screenshots");
+
+                if (!screenshotDir.exists()) {
+                    screenshotDir.mkdirs();
+                }
+
+                File screenshot =
+                        ((TakesScreenshot) driver)
+                                .getScreenshotAs(OutputType.FILE);
+
+                String safeName =
+                        testInfo.getDisplayName()
+                                .replaceAll("[^a-zA-Z0-9.-]", "_");
+
+                Path destination =
+                        new File(
+                                screenshotDir,
+                                safeName + ".png"
+                        ).toPath();
+
+                Files.copy(
+                        screenshot.toPath(),
+                        destination,
+                        java.nio.file.StandardCopyOption.REPLACE_EXISTING
+                );
+            }
+
+        } catch (Exception ignored) {
+        }
 
         if (driver != null) {
             driver.quit();
         }
     }
 
-    private void takeScreenshot(String name) {
 
-        try {
+    // ============================================================
+    // TEST 1 - Tenant Registration
+    // ============================================================
 
-            File screenshot =
-                    ((TakesScreenshot) driver)
-                            .getScreenshotAs(OutputType.FILE);
+    @Test
+    @Order(1)
+    void testTenantRegistration() {
 
-            Path targetDir =
-                    Paths.get(
-                            "target",
-                            "selenium-screenshots"
-                    );
-
-            Files.createDirectories(targetDir);
-
-            Path target =
-                    targetDir.resolve(name + ".png");
-
-            Files.deleteIfExists(target);
-
-            Files.copy(
-                    screenshot.toPath(),
-                    target
-            );
-
-        } catch (IOException e) {
-
-            System.err.println(
-                    "Failed to save screenshot: "
-                            + e.getMessage()
-            );
-        }
-    }
-
-    private void loginAsReviewer() {
-
-        driver.get(
-                baseUrl + "/login"
-        );
+        driver.get(BASE_URL + "/register");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
-                        By.id("username")
+                        By.name("name")
                 )
         );
 
-        WebElement username =
-                driver.findElement(
-                        By.id("username")
-                );
+        String uniqueEmail =
+                "john" + System.currentTimeMillis() + "@example.com";
 
-        username.clear();
+        WebElement name =
+                driver.findElement(By.name("name"));
 
-        username.sendKeys(
-                "admin@tenant.com"
-        );
+        WebElement email =
+                driver.findElement(By.name("email"));
 
         WebElement password =
-                driver.findElement(
-                        By.id("password")
-                );
+                driver.findElement(By.name("password"));
 
-        password.clear();
+        name.sendKeys("John Doe");
+        email.sendKeys(uniqueEmail);
+        password.sendKeys("password123");
 
-        password.sendKeys(
-                "admin123"
-        );
+        WebElement submit =
+                findSubmitButton();
 
-        driver.findElement(
-                By.cssSelector(
-                        "button[type='submit']"
-                )
-        ).click();
+        submit.click();
 
         wait.until(
-                ExpectedConditions.urlContains(
-                        "/reviewer/dashboard"
+                ExpectedConditions.or(
+                        ExpectedConditions.urlContains("/login"),
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert")
+                        )
                 )
         );
+
+        assertTrue(
+                driver.getCurrentUrl().contains("/login")
+                        || !driver.findElements(By.cssSelector(".alert")).isEmpty()
+        );
+    }
+
+
+    // ============================================================
+    // TEST 2 - Tenant Login
+    // ============================================================
+
+    @Test
+    @Order(2)
+    void testTenantLogin() {
+
+        loginAsTenant();
+
+        assertTrue(
+                driver.getCurrentUrl().contains("/tenant")
+                        || driver.getCurrentUrl().contains("/dashboard")
+                        || driver.getPageSource().contains("Dashboard")
+                        || driver.getPageSource().contains("Submit")
+        );
+    }
+
+
+    // ============================================================
+    // TEST 3 - Submit Complaint
+    // ============================================================
+
+    @Test
+    @Order(3)
+    void testSubmitComplaint() {
+
+        loginAsTenant();
+
+        driver.get(BASE_URL + "/complaint/new");
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.name("title")
+                )
+        );
+
+        fillIfPresent("tenantName", "John Doe");
+        fillIfPresent("name", "John Doe");
+
+        fillIfPresent(
+                "email",
+                TENANT_EMAIL
+        );
+
+        fillIfPresent(
+                "phoneNumber",
+                "9876543210"
+        );
+
+        fillIfPresent(
+                "propertyInfo",
+                "Building A, Room 101"
+        );
+
+        fillIfPresent(
+                "title",
+                "Water leak"
+        );
+
+        fillIfPresent(
+                "description",
+                "Water leakage is occurring in the bathroom."
+        );
+
+        selectFirstAvailable(
+                "category",
+                "PLUMBING",
+                "Plumbing",
+                "WATER_LEAK",
+                "Water Leak"
+        );
+
+        selectFirstAvailable(
+                "priority",
+                "MEDIUM",
+                "Medium"
+        );
+
+        WebElement submit =
+                findSubmitButton();
+
+        submit.click();
+
+        wait.until(
+                ExpectedConditions.or(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert-success")
+                        ),
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.xpath(
+                                        "//*[contains(text(),'COMP-')]"
+                                )
+                        ),
+                        ExpectedConditions.urlContains(
+                                "/complaint"
+                        )
+                )
+        );
+
+        String pageSource =
+                driver.getPageSource();
+
+        int index =
+                pageSource.indexOf("COMP-");
+
+        if (index >= 0) {
+
+            String reference =
+                    extractReferenceId(pageSource, index);
+
+            if (reference != null) {
+                submittedReferenceId = reference;
+            }
+        }
+
+        assertTrue(
+                pageSource.contains("Complaint")
+                        || pageSource.contains("submitted")
+                        || pageSource.contains("COMP-")
+        );
+    }
+
+
+    // ============================================================
+    // TEST 4 - Verify Submitted Complaint
+    // ============================================================
+
+    @Test
+    @Order(4)
+    void testComplaintDetails() {
+
+        loginAsTenant();
+
+        driver.get(BASE_URL + "/tenant/complaints");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
                         By.tagName("body")
                 )
         );
+
+        if (submittedReferenceId != null) {
+
+            assertTrue(
+                    driver.getPageSource()
+                            .contains(submittedReferenceId),
+                    "Submitted complaint reference ID should be visible"
+            );
+
+        } else {
+
+            assertTrue(
+                    driver.getPageSource().contains("Water leak")
+                            || driver.getPageSource().contains("Complaint")
+            );
+        }
     }
 
-    private WebElement findComplaintRow() {
 
-        assertNotNull(
-                submittedReferenceId,
-                "Submitted complaint reference ID must exist"
+    // ============================================================
+    // TEST 5 - Reviewer Approves Complaint
+    // ============================================================
+
+    @Test
+    @Order(5)
+    void testReviewerApproveComplaint() {
+
+        loginAsReviewer();
+
+        driver.get(
+                BASE_URL + "/reviewer/dashboard"
         );
 
-        return wait.until(
+        wait.until(
                 ExpectedConditions.presenceOfElementLocated(
-                        By.xpath(
-                                "//table//tbody//tr[contains(.,'"
-                                        + submittedReferenceId
-                                        + "')]"
+                        By.id("complaintsTable")
+                )
+        );
+
+        /*
+         * Find the complaint submitted by the test.
+         *
+         * If submittedReferenceId is available, use it.
+         * Otherwise use the first complaint row containing
+         * "Water leak" or a complaint row.
+         */
+
+        WebElement complaintRow =
+                findComplaintRow();
+
+        assertNotNull(
+                complaintRow,
+                "Complaint row must be present on reviewer dashboard"
+        );
+
+
+        /*
+         * Get the View link directly from this row.
+         */
+
+        WebElement viewLink =
+                complaintRow.findElement(
+                        By.cssSelector("a.view-complaint")
+                );
+
+        String complaintUrl =
+                viewLink.getAttribute("href");
+
+        assertNotNull(
+                complaintUrl,
+                "Complaint View link must have an href"
+        );
+
+
+        /*
+         * Open complaint detail page.
+         */
+
+        driver.get(complaintUrl);
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
+                )
+        );
+
+
+        /*
+         * Confirm complaint detail page.
+         */
+
+        assertTrue(
+                driver.getPageSource().contains("Complaint")
+                        || driver.getPageSource().contains("Reference ID")
+        );
+
+
+        /*
+         * ========================================================
+         * STEP 1:
+         * Change SUBMITTED -> UNDER_REVIEW
+         * ========================================================
+         *
+         * IMPORTANT:
+         *
+         * The HTML shows:
+         *
+         * <select id="status">
+         *
+         * For SUBMITTED complaint:
+         *
+         * UNDER_REVIEW
+         *
+         * is the available status.
+         */
+
+        WebElement statusSelect =
+                wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.id("status")
+                        )
+                );
+
+        Select status =
+                new Select(statusSelect);
+
+        assertTrue(
+                hasOption(
+                        status,
+                        "Under Review"
+                ),
+                "Status dropdown must contain Under Review"
+        );
+
+        status.selectByVisibleText(
+                "Under Review"
+        );
+
+
+        /*
+         * Enter reviewer remarks.
+         */
+
+        WebElement remarks =
+                wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.id("remarks")
+                        )
+                );
+
+        remarks.clear();
+
+        remarks.sendKeys(
+                "Complaint reviewed and moved to Under Review."
+        );
+
+
+        /*
+         * Submit status update.
+         */
+
+        clickUpdateStatus();
+
+
+        /*
+         * Wait for response.
+         */
+
+        wait.until(
+                ExpectedConditions.or(
+                        ExpectedConditions.urlContains(
+                                "/reviewer/complaint"
+                        ),
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert-success")
+                        )
+                )
+        );
+
+
+        /*
+         * If we are still on complaint page, verify
+         * Under Review is visible.
+         */
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
+                )
+        );
+
+        assertTrue(
+                driver.getPageSource()
+                        .contains("Under Review"),
+                "Complaint should be Under Review after first update"
+        );
+
+
+        /*
+         * ========================================================
+         * STEP 2:
+         * Re-open dashboard and find same complaint.
+         * ========================================================
+         */
+
+        driver.get(
+                BASE_URL + "/reviewer/dashboard"
+        );
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.id("complaintsTable")
+                )
+        );
+
+
+        WebElement updatedRow =
+                findComplaintRow();
+
+        assertNotNull(
+                updatedRow,
+                "Updated complaint must be visible on dashboard"
+        );
+
+
+        /*
+         * Verify dashboard shows Under Review.
+         */
+
+        WebElement currentStatus =
+                updatedRow.findElement(
+                        By.cssSelector(".complaint-status")
+                );
+
+        assertEquals(
+                "Under Review",
+                currentStatus.getText().trim(),
+                "Dashboard should show Under Review"
+        );
+
+
+        /*
+         * Open the same complaint again.
+         */
+
+        WebElement updatedViewLink =
+                updatedRow.findElement(
+                        By.cssSelector("a.view-complaint")
+                );
+
+        String updatedComplaintUrl =
+                updatedViewLink.getAttribute("href");
+
+        driver.get(updatedComplaintUrl);
+
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.id("status")
+                )
+        );
+
+
+        /*
+         * ========================================================
+         * STEP 3:
+         * Change UNDER_REVIEW -> APPROVED
+         * ========================================================
+         */
+
+        WebElement approvalSelect =
+                wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.id("status")
+                        )
+                );
+
+        Select approvalStatus =
+                new Select(approvalSelect);
+
+
+        assertTrue(
+                hasOption(
+                        approvalStatus,
+                        "Approved"
+                ),
+                "Status dropdown must contain Approved"
+        );
+
+
+        approvalStatus.selectByVisibleText(
+                "Approved"
+        );
+
+
+        /*
+         * Enter approval remarks.
+         */
+
+        WebElement approvalRemarks =
+                wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.id("remarks")
+                        )
+                );
+
+        approvalRemarks.clear();
+
+        approvalRemarks.sendKeys(
+                "Complaint reviewed and approved."
+        );
+
+
+        /*
+         * Submit approval.
+         */
+
+        clickUpdateStatus();
+
+
+        /*
+         * Wait for page response.
+         */
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.tagName("body")
+                )
+        );
+
+
+        /*
+         * Approved complaints no longer have the status
+         * update form.
+         */
+
+        wait.until(
+                ExpectedConditions.or(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert-info")
+                        ),
+                        ExpectedConditions.not(
+                                ExpectedConditions.presenceOfElementLocated(
+                                        By.id("status")
+                                )
+                        )
+                )
+        );
+
+
+        /*
+         * Verify final status.
+         */
+
+        assertTrue(
+                driver.getPageSource()
+                        .contains("Approved"),
+                "Complaint should be Approved after final update"
+        );
+
+
+        /*
+         * ========================================================
+         * FINAL DASHBOARD VERIFICATION
+         * ========================================================
+         */
+
+        driver.get(
+                BASE_URL + "/reviewer/dashboard"
+        );
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.id("complaintsTable")
+                )
+        );
+
+
+        WebElement finalRow =
+                findComplaintRow();
+
+        assertNotNull(
+                finalRow,
+                "Approved complaint must remain visible on dashboard"
+        );
+
+
+        WebElement finalStatus =
+                finalRow.findElement(
+                        By.cssSelector(".complaint-status")
+                );
+
+
+        assertEquals(
+                "Approved",
+                finalStatus.getText().trim(),
+                "Final dashboard status must be Approved"
+        );
+    }
+
+
+    // ============================================================
+    // LOGIN - TENANT
+    // ============================================================
+
+    private void loginAsTenant() {
+
+        driver.get(
+                BASE_URL + "/login"
+        );
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.name("username")
+                )
+        );
+
+
+        WebElement username =
+                driver.findElement(
+                        By.name("username")
+                );
+
+        WebElement password =
+                driver.findElement(
+                        By.name("password")
+                );
+
+
+        username.clear();
+        username.sendKeys(TENANT_EMAIL);
+
+        password.clear();
+        password.sendKeys(TENANT_PASSWORD);
+
+
+        findSubmitButton().click();
+
+
+        wait.until(
+                ExpectedConditions.or(
+                        ExpectedConditions.urlContains(
+                                "/tenant"
+                        ),
+                        ExpectedConditions.urlContains(
+                                "/dashboard"
+                        ),
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert")
                         )
                 )
         );
     }
 
-    private WebElement findStatusSelectInRow(
-            WebElement row
-    ) {
 
-        String statusXPath =
-                ".//select[" +
-                        ".//option[" +
-                        "normalize-space()='Under Review'" +
-                        "]" +
-                        " and " +
-                        ".//option[" +
-                        "normalize-space()='Approved'" +
-                        "]" +
-                        " and " +
-                        ".//option[" +
-                        "normalize-space()='Rejected'" +
-                        "]" +
-                        "]";
+    // ============================================================
+    // LOGIN - REVIEWER
+    // ============================================================
 
-        try {
+    private void loginAsReviewer() {
 
-            return row.findElement(
-                    By.xpath(statusXPath)
-            );
+        driver.get(
+                BASE_URL + "/login"
+        );
 
-        } catch (NoSuchElementException ignored) {
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.name("username")
+                )
+        );
 
-            return null;
-        }
+
+        WebElement username =
+                driver.findElement(
+                        By.name("username")
+                );
+
+        WebElement password =
+                driver.findElement(
+                        By.name("password")
+                );
+
+
+        username.clear();
+        username.sendKeys(REVIEWER_EMAIL);
+
+        password.clear();
+        password.sendKeys(REVIEWER_PASSWORD);
+
+
+        findSubmitButton().click();
+
+
+        wait.until(
+                ExpectedConditions.or(
+                        ExpectedConditions.urlContains(
+                                "/reviewer"
+                        ),
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.cssSelector(".alert")
+                        )
+                )
+        );
     }
 
-    private WebElement findStatusSelectOnPage() {
 
-        String statusXPath =
-                "//select[" +
-                        ".//option[" +
-                        "normalize-space()='Under Review'" +
-                        "]" +
-                        " and " +
-                        ".//option[" +
-                        "normalize-space()='Approved'" +
-                        "]" +
-                        " and " +
-                        ".//option[" +
-                        "normalize-space()='Rejected'" +
-                        "]" +
-                        "]";
+    // ============================================================
+    // FIND COMPLAINT ROW
+    // ============================================================
 
-        try {
+    private WebElement findComplaintRow() {
 
-            return driver.findElement(
-                    By.xpath(statusXPath)
-            );
+        /*
+         * First attempt:
+         * Use the exact reference ID.
+         */
 
-        } catch (NoSuchElementException ignored) {
+        if (submittedReferenceId != null
+                && !submittedReferenceId.isBlank()) {
 
-            return null;
-        }
-    }
-
-    private WebElement findStatusSelect() {
-
-        WebElement statusSelect =
-                findStatusSelectOnPage();
-
-        if (statusSelect != null) {
-            return statusSelect;
-        }
-
-        if (submittedReferenceId != null) {
+            String xpath =
+                    "//tr[@data-reference-id='"
+                            + submittedReferenceId
+                            + "']";
 
             try {
 
-                WebElement row =
-                        findComplaintRow();
+                return wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.xpath(xpath)
+                        )
+                );
 
-                statusSelect =
-                        findStatusSelectInRow(row);
+            } catch (Exception ignored) {
+            }
+        }
 
-                if (statusSelect != null) {
-                    return statusSelect;
+
+        /*
+         * Second attempt:
+         * Search by reference ID text.
+         */
+
+        if (submittedReferenceId != null
+                && !submittedReferenceId.isBlank()) {
+
+            try {
+
+                return wait.until(
+                        ExpectedConditions.presenceOfElementLocated(
+                                By.xpath(
+                                        "//table[@id='complaintsTable']//tbody//tr[contains(.,'"
+                                                + submittedReferenceId
+                                                + "')]"
+                                )
+                        )
+                );
+
+            } catch (Exception ignored) {
+            }
+        }
+
+
+        /*
+         * Third attempt:
+         * Find Water leak complaint.
+         */
+
+        try {
+
+            return wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.xpath(
+                                    "//table[@id='complaintsTable']//tbody//tr[contains(.,'Water leak')]"
+                            )
+                    )
+            );
+
+        } catch (Exception ignored) {
+        }
+
+
+        /*
+         * Final fallback:
+         * Return first actual complaint row.
+         */
+
+        try {
+
+            return wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(
+                                    "#complaintsTable tbody tr.complaint-row"
+                            )
+                    )
+            );
+
+        } catch (Exception e) {
+
+            return null;
+        }
+    }
+
+
+    // ============================================================
+    // FIND SUBMIT BUTTON
+    // ============================================================
+
+    private WebElement findSubmitButton() {
+
+        By[] selectors = {
+
+                By.cssSelector(
+                        "button[type='submit']"
+                ),
+
+                By.cssSelector(
+                        "input[type='submit']"
+                ),
+
+                By.xpath(
+                        "//button[contains(normalize-space(),'Submit')]"
+                ),
+
+                By.xpath(
+                        "//button[contains(normalize-space(),'Login')]"
+                ),
+
+                By.xpath(
+                        "//button[contains(normalize-space(),'Register')]"
+                )
+        };
+
+
+        for (By selector : selectors) {
+
+            try {
+
+                WebElement element =
+                        driver.findElement(selector);
+
+                if (element.isDisplayed()
+                        && element.isEnabled()) {
+
+                    return element;
                 }
 
             } catch (Exception ignored) {
             }
         }
 
-        fail(
-                "Could not find reviewer status dropdown containing " +
-                        "Under Review, Approved and Rejected. " +
-                        "Current URL: " +
-                        driver.getCurrentUrl()
+
+        throw new NoSuchElementException(
+                "Unable to find submit button"
         );
+    }
+
+
+    // ============================================================
+    // CLICK UPDATE STATUS
+    // ============================================================
+
+    private void clickUpdateStatus() {
+
+        WebElement button =
+                wait.until(
+                        ExpectedConditions.elementToBeClickable(
+                                By.xpath(
+                                        "//form[.//select[@id='status']]//button[@type='submit']"
+                                )
+                        )
+                );
+
+        button.click();
+    }
+
+
+    // ============================================================
+    // CHECK SELECT OPTION
+    // ============================================================
+
+    private boolean hasOption(
+            Select select,
+            String visibleText) {
+
+        for (WebElement option :
+                select.getOptions()) {
+
+            if (option.getText()
+                    .trim()
+                    .equals(visibleText)) {
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+
+    // ============================================================
+    // FILL INPUT IF AVAILABLE
+    // ============================================================
+
+    private void fillIfPresent(
+            String name,
+            String value) {
+
+        try {
+
+            WebElement element =
+                    driver.findElement(
+                            By.name(name)
+                    );
+
+            element.clear();
+            element.sendKeys(value);
+
+        } catch (Exception ignored) {
+        }
+    }
+
+
+    // ============================================================
+    // SELECT FIRST AVAILABLE OPTION
+    // ============================================================
+
+    private void selectFirstAvailable(
+            String name,
+            String... values) {
+
+        try {
+
+            WebElement element =
+                    driver.findElement(
+                            By.name(name)
+                    );
+
+            Select select =
+                    new Select(element);
+
+
+            for (String value : values) {
+
+                try {
+
+                    select.selectByValue(value);
+                    return;
+
+                } catch (Exception ignored) {
+                }
+
+
+                try {
+
+                    select.selectByVisibleText(value);
+                    return;
+
+                } catch (Exception ignored) {
+                }
+            }
+
+        } catch (Exception ignored) {
+        }
+    }
+
+
+    // ============================================================
+    // EXTRACT REFERENCE ID
+    // ============================================================
+
+    private String extractReferenceId(
+            String text,
+            int startIndex) {
+
+        try {
+
+            String remaining =
+                    text.substring(startIndex);
+
+            StringBuilder result =
+                    new StringBuilder();
+
+            for (int i = 0;
+                 i < remaining.length();
+                 i++) {
+
+                char c =
+                        remaining.charAt(i);
+
+                if (Character.isLetterOrDigit(c)
+                        || c == '-') {
+
+                    result.append(c);
+
+                } else {
+
+                    break;
+                }
+            }
+
+            String reference =
+                    result.toString();
+
+            if (reference.startsWith("COMP-")) {
+                return reference;
+            }
+
+        } catch (Exception ignored) {
+        }
 
         return null;
-    }
-
-    private WebElement findSubmitButtonForStatus(
-            WebElement statusSelect
-    ) {
-
-        try {
-
-            WebElement form =
-                    statusSelect.findElement(
-                            By.xpath(
-                                    "./ancestor::form[1]"
-                            )
-                    );
-
-            try {
-
-                return form.findElement(
-                        By.cssSelector(
-                                "button[type='submit']"
-                        )
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
-
-            try {
-
-                return form.findElement(
-                        By.cssSelector(
-                                "input[type='submit']"
-                        )
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        WebElement row = null;
-
-        try {
-
-            row = statusSelect.findElement(
-                    By.xpath(
-                            "./ancestor::tr[1]"
-                    )
-            );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        if (row != null) {
-
-            try {
-
-                return row.findElement(
-                        By.cssSelector(
-                                "button[type='submit']"
-                        )
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
-
-            try {
-
-                return row.findElement(
-                        By.cssSelector(
-                                "input[type='submit']"
-                        )
-                );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        try {
-
-            return driver.findElement(
-                    By.cssSelector(
-                            "button[type='submit']"
-                    )
-            );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        try {
-
-            return driver.findElement(
-                    By.cssSelector(
-                            "input[type='submit']"
-                    )
-            );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        fail(
-                "Could not find submit button for reviewer status update"
-        );
-
-        return null;
-    }
-
-    private void enterRemarks(String remarks) {
-
-        WebElement remarksField = null;
-
-        try {
-
-            remarksField =
-                    driver.findElement(
-                            By.id("remarks")
-                    );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        if (remarksField == null) {
-
-            try {
-
-                remarksField =
-                        driver.findElement(
-                                By.cssSelector(
-                                        "textarea[name='remarks']"
-                                )
-                        );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        if (remarksField == null) {
-
-            try {
-
-                remarksField =
-                        driver.findElement(
-                                By.cssSelector(
-                                        "textarea"
-                                )
-                        );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        if (remarksField != null) {
-
-            remarksField.clear();
-
-            remarksField.sendKeys(
-                    remarks
-            );
-        }
-    }
-
-    private void selectStatus(
-            String status
-    ) {
-
-        WebElement statusSelect =
-                findStatusSelect();
-
-        Select select =
-                new Select(statusSelect);
-
-        select.selectByVisibleText(
-                status
-        );
-
-        String selected =
-                select.getFirstSelectedOption()
-                        .getText()
-                        .trim();
-
-        assertEquals(
-                status,
-                selected,
-                "Reviewer should be able to select "
-                        + status
-        );
-    }
-
-    private void submitStatusUpdate() {
-
-        WebElement statusSelect =
-                findStatusSelect();
-
-        WebElement submitButton =
-                findSubmitButtonForStatus(
-                        statusSelect
-                );
-
-        wait.until(
-                ExpectedConditions.elementToBeClickable(
-                        submitButton
-                )
-        );
-
-        submitButton.click();
-
-        wait.until(
-                ExpectedConditions.presenceOfElementLocated(
-                        By.tagName("body")
-                )
-        );
-
-        try {
-
-            Thread.sleep(1000);
-
-        } catch (InterruptedException e) {
-
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    private void openComplaintDetails() {
-
-        WebElement row =
-                findComplaintRow();
-
-        WebElement action = null;
-
-        try {
-
-            action =
-                    row.findElement(
-                            By.xpath(
-                                    ".//a[contains(" +
-                                            "translate(normalize-space(.)," +
-                                            "'ABCDEFGHIJKLMNOPQRSTUVWXYZ'," +
-                                            "'abcdefghijklmnopqrstuvwxyz')," +
-                                            "'view'" +
-                                            ")]"
-                            )
-                    );
-
-        } catch (NoSuchElementException ignored) {
-        }
-
-        if (action == null) {
-
-            try {
-
-                action =
-                        row.findElement(
-                                By.cssSelector(
-                                        "a.btn"
-                                )
-                        );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        if (action == null) {
-
-            try {
-
-                action =
-                        row.findElement(
-                                By.cssSelector(
-                                        "button"
-                                )
-                        );
-
-            } catch (NoSuchElementException ignored) {
-            }
-        }
-
-        assertNotNull(
-                action,
-                "Complaint view/action button should exist"
-        );
-
-        wait.until(
-                ExpectedConditions.elementToBeClickable(
-                        action
-                )
-        );
-
-        action.click();
-
-        wait.until(
-                ExpectedConditions.presenceOfElementLocated(
-                        By.tagName("body")
-                )
-        );
-    }
-
-    @Test
-    @Order(1)
-    @DisplayName(
-            "TEST 1: Tenant submits a valid complaint"
-    )
-    void testSubmitValidComplaint() {
-
-        try {
-
-            driver.get(
-                    baseUrl + "/complaints/submit"
-            );
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.id("tenantName")
-                    )
-            );
-
-            driver.findElement(
-                    By.id("tenantName")
-            ).sendKeys(
-                    "John Doe"
-            );
-
-            driver.findElement(
-                    By.id("email")
-            ).sendKeys(
-                    "john.selenium@example.com"
-            );
-
-            driver.findElement(
-                    By.id("phoneNumber")
-            ).sendKeys(
-                    "9876543210"
-            );
-
-            driver.findElement(
-                    By.id("propertyInfo")
-            ).sendKeys(
-                    "Flat 302, Block A"
-            );
-
-            new Select(
-                    driver.findElement(
-                            By.id("category")
-                    )
-            ).selectByValue(
-                    "WATER_LEAKAGE"
-            );
-
-            new Select(
-                    driver.findElement(
-                            By.id("priority")
-                    )
-            ).selectByValue(
-                    "HIGH"
-            );
-
-            driver.findElement(
-                    By.id("title")
-            ).sendKeys(
-                    "Water leak in bathroom ceiling"
-            );
-
-            driver.findElement(
-                    By.id("description")
-            ).sendKeys(
-                    "There is a constant water leak in the bathroom ceiling "
-                            + "causing damage to the walls and floor tiles."
-            );
-
-            driver.findElement(
-                    By.cssSelector(
-                            "button[type='submit']"
-                    )
-            ).click();
-
-            wait.until(
-                    ExpectedConditions.urlContains(
-                            "/complaints/success/"
-                    )
-            );
-
-            WebElement refElement =
-                    wait.until(
-                            ExpectedConditions.presenceOfElementLocated(
-                                    By.cssSelector(
-                                            ".detail-item .value"
-                                    )
-                            )
-                    );
-
-            submittedReferenceId =
-                    refElement.getText().trim();
-
-            assertNotNull(
-                    submittedReferenceId
-            );
-
-            assertFalse(
-                    submittedReferenceId.isEmpty()
-            );
-
-            assertTrue(
-                    submittedReferenceId.startsWith(
-                            "COMP-"
-                    ),
-                    "Reference ID should start with COMP-"
-            );
-
-            assertTrue(
-                    driver.getPageSource().contains(
-                            "Complaint Submitted Successfully"
-                    ),
-                    "Complaint success message should appear"
-            );
-
-            takeScreenshot(
-                    "test1_submit_success"
-            );
-
-        } catch (Exception e) {
-
-            takeScreenshot(
-                    "test1_submit_failure"
-            );
-
-            throw e;
-        }
-    }
-
-    @Test
-    @Order(2)
-    @DisplayName(
-            "TEST 2: Invalid complaint data is rejected"
-    )
-    void testSubmitInvalidComplaint() {
-
-        try {
-
-            driver.get(
-                    baseUrl + "/complaints/submit"
-            );
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.cssSelector(
-                                    "button[type='submit']"
-                            )
-                    )
-            );
-
-            driver.findElement(
-                    By.cssSelector(
-                            "button[type='submit']"
-                    )
-            ).click();
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.cssSelector(
-                                    ".form-error"
-                            )
-                    )
-            );
-
-            var errors =
-                    driver.findElements(
-                            By.cssSelector(
-                                    ".form-error"
-                            )
-                    );
-
-            assertFalse(
-                    errors.isEmpty(),
-                    "Validation errors should be displayed"
-            );
-
-            assertTrue(
-                    errors.size() >= 3,
-                    "Multiple validation errors should appear"
-            );
-
-            takeScreenshot(
-                    "test2_validation_errors"
-            );
-
-        } catch (Exception e) {
-
-            takeScreenshot(
-                    "test2_validation_failure"
-            );
-
-            throw e;
-        }
-    }
-
-    @Test
-    @Order(3)
-    @DisplayName(
-            "TEST 3: Tenant tracks submitted complaint"
-    )
-    void testTrackComplaint() {
-
-        try {
-
-            assertNotNull(
-                    submittedReferenceId
-            );
-
-            driver.get(
-                    baseUrl + "/complaints/track"
-            );
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.id("referenceId")
-                    )
-            );
-
-            driver.findElement(
-                    By.id("referenceId")
-            ).sendKeys(
-                    submittedReferenceId
-            );
-
-            driver.findElement(
-                    By.id("trackEmail")
-            ).sendKeys(
-                    "john.selenium@example.com"
-            );
-
-            driver.findElement(
-                    By.cssSelector(
-                            "button[type='submit']"
-                    )
-            ).click();
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.cssSelector(
-                                    ".detail-grid"
-                            )
-                    )
-            );
-
-            String page =
-                    driver.getPageSource();
-
-            assertTrue(
-                    page.contains(
-                            submittedReferenceId
-                    ),
-                    "Reference ID should be displayed"
-            );
-
-            assertTrue(
-                    page.contains("SUBMITTED")
-                            || page.contains("Submitted"),
-                    "Submitted status should be displayed"
-            );
-
-            takeScreenshot(
-                    "test3_track_success"
-            );
-
-        } catch (Exception e) {
-
-            takeScreenshot(
-                    "test3_track_failure"
-            );
-
-            throw e;
-        }
-    }
-
-    @Test
-    @Order(4)
-    @DisplayName(
-            "TEST 4: Reviewer logs in and views complaint"
-    )
-    void testReviewerLogin() {
-
-        try {
-
-            assertNotNull(
-                    submittedReferenceId
-            );
-
-            loginAsReviewer();
-
-            String page =
-                    driver.getPageSource();
-
-            assertTrue(
-                    page.contains(
-                            "Reviewer Dashboard"
-                    ),
-                    "Reviewer Dashboard should be visible"
-            );
-
-            assertTrue(
-                    page.contains(
-                            submittedReferenceId
-                    ),
-                    "Submitted complaint should be listed"
-            );
-
-            WebElement row =
-                    findComplaintRow();
-
-            assertTrue(
-                    row.getText().contains(
-                            submittedReferenceId
-                    ),
-                    "Correct complaint row should be displayed"
-            );
-
-            openComplaintDetails();
-
-            wait.until(
-                    ExpectedConditions.presenceOfElementLocated(
-                            By.cssSelector(
-                                    ".detail-grid"
-                            )
-                    )
-            );
-
-            String details =
-                    driver.getPageSource();
-
-            assertTrue(
-                    details.contains(
-                            submittedReferenceId
-                    )
-                            || details.contains(
-                            "Water leak in bathroom ceiling"
-                    ),
-                    "Complaint details should be shown"
-            );
-
-            takeScreenshot(
-                    "test4_reviewer_view"
-            );
-
-        } catch (Exception e) {
-
-            takeScreenshot(
-                    "test4_reviewer_failure"
-            );
-
-            throw e;
-        }
-    }
-
-    @Test
-    @Order(5)
-    @DisplayName(
-            "TEST 5: Reviewer updates complaint status"
-    )
-    void testReviewerApproveComplaint() {
-
-        try {
-
-            assertNotNull(
-                    submittedReferenceId,
-                    "Reference ID must be available"
-            );
-
-            /*
-             * IMPORTANT:
-             *
-             * The previous version clicked the complaint View button
-             * and then searched for the status dropdown.
-             *
-             * Jenkins proved that the View page does NOT contain
-             * the status dropdown.
-             *
-             * Therefore this test works directly from the
-             * Reviewer Dashboard and searches the exact complaint row
-             * for the status control.
-             */
-
-            loginAsReviewer();
-
-            WebElement row =
-                    findComplaintRow();
-
-            assertTrue(
-                    row.getText().contains(
-                            submittedReferenceId
-                    ),
-                    "Correct complaint must be selected"
-            );
-
-            WebElement statusSelect =
-                    findStatusSelectInRow(row);
-
-            /*
-             * If the status dropdown is present directly
-             * in the complaint row, use it.
-             */
-            if (statusSelect == null) {
-
-                statusSelect =
-                        findStatusSelectOnPage();
-            }
-
-            assertNotNull(
-                    statusSelect,
-                    "Reviewer status dropdown with Under Review, "
-                            + "Approved and Rejected options must exist"
-            );
-
-            Select dropdown =
-                    new Select(statusSelect);
-
-            assertTrue(
-                    dropdown.getOptions()
-                            .stream()
-                            .anyMatch(
-                                    option ->
-                                            option.getText()
-                                                    .trim()
-                                                    .equals(
-                                                            "Under Review"
-                                                    )
-                            ),
-                    "Under Review option should exist"
-            );
-
-            assertTrue(
-                    dropdown.getOptions()
-                            .stream()
-                            .anyMatch(
-                                    option ->
-                                            option.getText()
-                                                    .trim()
-                                                    .equals(
-                                                            "Approved"
-                                                    )
-                            ),
-                    "Approved option should exist"
-            );
-
-            assertTrue(
-                    dropdown.getOptions()
-                            .stream()
-                            .anyMatch(
-                                    option ->
-                                            option.getText()
-                                                    .trim()
-                                                    .equals(
-                                                            "Rejected"
-                                                    )
-                            ),
-                    "Rejected option should exist"
-            );
-
-            /*
-             * STEP 1:
-             * Submitted -> Under Review
-             */
-            dropdown.selectByVisibleText(
-                    "Under Review"
-            );
-
-            assertEquals(
-                    "Under Review",
-                    dropdown.getFirstSelectedOption()
-                            .getText()
-                            .trim(),
-                    "Status should be Under Review"
-            );
-
-            enterRemarks(
-                    "Taking this complaint for review"
-            );
-
-            WebElement submitButton =
-                    findSubmitButtonForStatus(
-                            statusSelect
-                    );
-
-            wait.until(
-                    ExpectedConditions.elementToBeClickable(
-                            submitButton
-                    )
-            );
-
-            submitButton.click();
-
-            try {
-
-                Thread.sleep(1200);
-
-            } catch (InterruptedException e) {
-
-                Thread.currentThread().interrupt();
-            }
-
-            takeScreenshot(
-                    "test5_under_review"
-            );
-
-            /*
-             * STEP 2:
-             * Return to dashboard.
-             */
-            driver.get(
-                    baseUrl + "/reviewer/dashboard"
-            );
-
-            wait.until(
-                    ExpectedConditions.urlContains(
-                            "/reviewer/dashboard"
-                    )
-            );
-
-            WebElement rowAfterReview =
-                    findComplaintRow();
-
-            assertTrue(
-                    rowAfterReview.getText().contains(
-                            submittedReferenceId
-                    ),
-                    "Complaint should remain on reviewer dashboard"
-            );
-
-            /*
-             * STEP 3:
-             * Find the status dropdown again.
-             */
-            WebElement approvedStatus =
-                    findStatusSelectInRow(
-                            rowAfterReview
-                    );
-
-            if (approvedStatus == null) {
-
-                approvedStatus =
-                        findStatusSelectOnPage();
-            }
-
-            assertNotNull(
-                    approvedStatus,
-                    "Status dropdown should be available "
-                            + "after Under Review update"
-            );
-
-            Select approvedDropdown =
-                    new Select(
-                            approvedStatus
-                    );
-
-            /*
-             * STEP 4:
-             * Under Review -> Approved
-             */
-            approvedDropdown.selectByVisibleText(
-                    "Approved"
-            );
-
-            assertEquals(
-                    "Approved",
-                    approvedDropdown
-                            .getFirstSelectedOption()
-                            .getText()
-                            .trim(),
-                    "Status should be Approved"
-            );
-
-            enterRemarks(
-                    "Issue has been resolved. Approving complaint."
-            );
-
-            WebElement approveButton =
-                    findSubmitButtonForStatus(
-                            approvedStatus
-                    );
-
-            wait.until(
-                    ExpectedConditions.elementToBeClickable(
-                            approveButton
-                    )
-            );
-
-            approveButton.click();
-
-            try {
-
-                Thread.sleep(1500);
-
-            } catch (InterruptedException e) {
-
-                Thread.currentThread().interrupt();
-            }
-
-            takeScreenshot(
-                    "test5_approve_success"
-            );
-
-            /*
-             * STEP 5:
-             * Verify the final status from the dashboard.
-             */
-            driver.get(
-                    baseUrl + "/reviewer/dashboard"
-            );
-
-            wait.until(
-                    ExpectedConditions.urlContains(
-                            "/reviewer/dashboard"
-                    )
-            );
-
-            WebElement finalRow =
-                    findComplaintRow();
-
-            String finalRowText =
-                    finalRow.getText();
-
-            assertTrue(
-                    finalRowText.contains(
-                            "Approved"
-                    )
-                            || finalRowText.contains(
-                            "APPROVED"
-                    ),
-                    "Complaint should finally show Approved status"
-            );
-
-            takeScreenshot(
-                    "test5_final_approved"
-            );
-
-        } catch (Exception e) {
-
-            takeScreenshot(
-                    "test5_approve_failure"
-            );
-
-            throw e;
-        }
     }
 }

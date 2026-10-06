@@ -1,11 +1,10 @@
-version: '3.8'
 
 services:
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    image: tenant-complaint-management-system:latest
+    image: ${APP_IMAGE:-tenant-complaint-management-system:latest}
     container_name: tenant_cms_app
     ports:
       - "8080:8080"

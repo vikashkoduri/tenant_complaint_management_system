@@ -1,186 +1,201 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Complaint Detail - TenantCMS</title>
     <link rel="stylesheet" th:href="@{/css/style.css}">
 </head>
+
 <body>
 
-<nav class="navbar">
-    <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
-    <ul class="navbar-nav">
-        <li><a th:href="@{/}">Home</a></li>
-        <li><a th:href="@{/reviewer/dashboard}">Dashboard</a></li>
-        <li>
-            <form th:action="@{/logout}" method="post" style="display:inline">
-                <button type="submit" class="btn btn-sm btn-outline" style="color:#cbd5e1;border-color:#cbd5e1;">Logout</button>
-            </form>
-        </li>
-    </ul>
-</nav>
+    <nav class="navbar">
+        <a href="/" class="navbar-brand">&#127970; Tenant<span>CMS</span></a>
+        <ul class="navbar-nav">
+            <li><a th:href="@{/}">Home</a></li>
+            <li><a th:href="@{/reviewer/dashboard}">Dashboard</a></li>
+            <li>
+                <form th:action="@{/logout}" method="post" style="display:inline">
+                    <button type="submit" class="btn btn-sm btn-outline"
+                        style="color:#cbd5e1;border-color:#cbd5e1;">Logout</button>
+                </form>
+            </li>
+        </ul>
+    </nav>
 
-<div class="container">
-    <div style="margin-top:1rem;margin-bottom:1.5rem;">
-        <a th:href="@{/reviewer/dashboard}" style="color:var(--text-muted);">&#8592; Back to Dashboard</a>
-    </div>
-
-    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
-    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
-
-    <!-- Complaint Info -->
-    <div class="card" style="margin-bottom:1.5rem;">
-        <div class="card-header">
-            Complaint <span th:text="${complaint.referenceId}" style="color:var(--primary);"></span>
+    <div class="container">
+        <div style="margin-top:1rem;margin-bottom:1.5rem;">
+            <a th:href="@{/reviewer/dashboard}" style="color:var(--text-muted);">&#8592; Back to Dashboard</a>
         </div>
-        <div class="card-body">
-            <div class="detail-grid">
-                <div class="detail-item">
-                    <div class="label">Reference ID</div>
-                    <div class="value" style="font-weight:700;color:var(--primary);" th:text="${complaint.referenceId}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Current Status</div>
-                    <div class="value">
-                        <span th:class="'badge badge-' + ${complaint.status.name().toLowerCase().replace('_', '-')}"
-                              th:text="${complaint.status.displayName}"></span>
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Tenant Name</div>
-                    <div class="value" th:text="${complaint.tenantName}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Email</div>
-                    <div class="value" th:text="${complaint.email}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Phone</div>
-                    <div class="value" th:text="${complaint.phoneNumber}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Property</div>
-                    <div class="value" th:text="${complaint.propertyInfo}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Category</div>
-                    <div class="value" th:text="${complaint.category.displayName}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Priority</div>
-                    <div class="value">
-                        <span th:class="'priority-' + ${complaint.priority.name().toLowerCase()}"
-                              th:text="${complaint.priority.displayName}"></span>
-                    </div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Date Submitted</div>
-                    <div class="value" th:text="${#temporals.format(complaint.createdAt, 'dd MMM yyyy, hh:mm a')}"></div>
-                </div>
-                <div class="detail-item">
-                    <div class="label">Last Updated</div>
-                    <div class="value" th:text="${#temporals.format(complaint.updatedAt, 'dd MMM yyyy, hh:mm a')}"></div>
-                </div>
-                <div class="detail-item detail-full">
-                    <div class="label">Title</div>
-                    <div class="value" th:text="${complaint.title}"></div>
-                </div>
-                <div class="detail-item detail-full">
-                    <div class="label">Description</div>
-                    <div class="value" th:text="${complaint.description}"></div>
-                </div>
 
-                <!-- Document Info -->
-                <div class="detail-item detail-full" th:if="${complaint.document != null}">
-                    <div class="label">Attached Document</div>
-                    <div class="value">
-                        <span th:text="${complaint.document.originalFilename}"></span>
-                        (<span th:text="${#numbers.formatDecimal(complaint.document.fileSize / 1024.0, 0, 1)}"></span> KB,
-                        <span th:text="${complaint.document.contentType}"></span>)
-                    </div>
-                </div>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
 
-                <div class="detail-item detail-full" th:if="${complaint.reviewerRemarks != null}">
-                    <div class="label">Current Reviewer Remarks</div>
-                    <div class="value" th:text="${complaint.reviewerRemarks}"></div>
+        <!-- Complaint Info -->
+        <div class="card" style="margin-bottom:1.5rem;">
+            <div class="card-header">
+                Complaint <span th:text="${complaint.referenceId}" style="color:var(--primary);"></span>
+            </div>
+            <div class="card-body">
+                <div class="detail-grid">
+                    <div class="detail-item">
+                        <div class="label">Reference ID</div>
+                        <div class="value" style="font-weight:700;color:var(--primary);"
+                            th:text="${complaint.referenceId}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Current Status</div>
+                        <div class="value">
+                            <span th:class="'badge badge-' + ${complaint.status.name().toLowerCase().replace('_', '-')}"
+                                th:text="${complaint.status.displayName}"></span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Tenant Name</div>
+                        <div class="value" th:text="${complaint.tenantName}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Email</div>
+                        <div class="value" th:text="${complaint.email}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Phone</div>
+                        <div class="value" th:text="${complaint.phoneNumber}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Property</div>
+                        <div class="value" th:text="${complaint.propertyInfo}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Category</div>
+                        <div class="value" th:text="${complaint.category.displayName}"></div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Priority</div>
+                        <div class="value">
+                            <span th:class="'priority-' + ${complaint.priority.name().toLowerCase()}"
+                                th:text="${complaint.priority.displayName}"></span>
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Date Submitted</div>
+                        <div class="value" th:text="${#temporals.format(complaint.createdAt, 'dd MMM yyyy, hh:mm a')}">
+                        </div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="label">Last Updated</div>
+                        <div class="value" th:text="${#temporals.format(complaint.updatedAt, 'dd MMM yyyy, hh:mm a')}">
+                        </div>
+                    </div>
+                    <div class="detail-item detail-full">
+                        <div class="label">Title</div>
+                        <div class="value" th:text="${complaint.title}"></div>
+                    </div>
+                    <div class="detail-item detail-full">
+                        <div class="label">Description</div>
+                        <div class="value" th:text="${complaint.description}"></div>
+                    </div>
+
+                    <!-- Document Info -->
+                    <div class="detail-item detail-full" th:if="${complaint.document != null}">
+                        <div class="label">Attached Document</div>
+                        <div class="value">
+                            <span th:text="${complaint.document.originalFilename}"></span>
+                            (<span
+                                th:text="${#numbers.formatDecimal(complaint.document.fileSize / 1024.0, 0, 1)}"></span>
+                            KB,
+                            <span th:text="${complaint.document.contentType}"></span>)
+                        </div>
+                    </div>
+
+                    <div class="detail-item detail-full" th:if="${complaint.reviewerRemarks != null}">
+                        <div class="label">Current Reviewer Remarks</div>
+                        <div class="value" th:text="${complaint.reviewerRemarks}"></div>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <!-- Update Status Form (only if not in terminal status) -->
-    <div class="card" style="margin-bottom:1.5rem;"
-         th:if="${complaint.status.name() != 'APPROVED' and complaint.status.name() != 'REJECTED'}">
-        <div class="card-header">Update Status</div>
-        <div class="card-body">
-            <form th:action="@{/reviewer/complaint/{id}/update(id=${complaint.id})}"
-                  th:object="${updateDTO}" method="post">
-                <div class="form-row">
-                    <div class="form-group">
-                        <label for="status">New Status <span class="required">*</span></label>
-                        <select id="status" th:field="*{status}" class="form-control">
-                            <option value="">-- Select Status --</option>
-                            <option th:if="${complaint.status.name() == 'SUBMITTED'}"
-                                    value="UNDER_REVIEW">Under Review</option>
-                            <option th:if="${complaint.status.name() == 'UNDER_REVIEW' or complaint.status.name() == 'ACTION_REQUIRED'}"
+        <!-- Update Status Form (only if not in terminal status) -->
+        <div class="card" style="margin-bottom:1.5rem;"
+            th:if="${complaint.status.name() != 'APPROVED' and complaint.status.name() != 'REJECTED'}">
+            <div class="card-header">Update Status</div>
+            <div class="card-body">
+                <form th:action="@{/reviewer/complaint/{id}/update(id=${complaint.id})}" th:object="${updateDTO}"
+                    method="post">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="status">New Status <span class="required">*</span></label>
+                            <select id="status" th:field="*{status}" class="form-control">
+                                <option value="">-- Select Status --</option>
+                                <option th:if="${complaint.status.name() == 'SUBMITTED'}" value="UNDER_REVIEW">Under
+                                    Review</option>
+                                <option
+                                    th:if="${complaint.status.name() == 'UNDER_REVIEW' or complaint.status.name() == 'ACTION_REQUIRED'}"
                                     value="APPROVED">Approved</option>
-                            <option th:if="${complaint.status.name() == 'UNDER_REVIEW' or complaint.status.name() == 'ACTION_REQUIRED'}"
+                                <option
+                                    th:if="${complaint.status.name() == 'UNDER_REVIEW' or complaint.status.name() == 'ACTION_REQUIRED'}"
                                     value="REJECTED">Rejected</option>
-                            <option th:if="${complaint.status.name() == 'UNDER_REVIEW'}"
-                                    value="ACTION_REQUIRED">Action Required</option>
-                            <option th:if="${complaint.status.name() == 'ACTION_REQUIRED'}"
-                                    value="UNDER_REVIEW">Under Review</option>
-                        </select>
-                        <div th:if="${#fields.hasErrors('status')}" class="form-error" th:errors="*{status}"></div>
+                                <option th:if="${complaint.status.name() == 'UNDER_REVIEW'}" value="ACTION_REQUIRED">
+                                    Action Required</option>
+                                <option th:if="${complaint.status.name() == 'ACTION_REQUIRED'}" value="UNDER_REVIEW">
+                                    Under Review</option>
+                            </select>
+                            <div th:if="${#fields.hasErrors('status')}" class="form-error" th:errors="*{status}"></div>
+                        </div>
+                        <div class="form-group">
+                            <label for="remarks">Remarks</label>
+                            <textarea id="remarks" th:field="*{remarks}" class="form-control" rows="3"
+                                placeholder="Add your remarks (optional)"></textarea>
+                            <div th:if="${#fields.hasErrors('remarks')}" class="form-error" th:errors="*{remarks}">
+                            </div>
+                        </div>
                     </div>
-                    <div class="form-group">
-                        <label for="remarks">Remarks</label>
-                        <textarea id="remarks" th:field="*{remarks}" class="form-control" rows="3"
-                                  placeholder="Add your remarks (optional)"></textarea>
-                        <div th:if="${#fields.hasErrors('remarks')}" class="form-error" th:errors="*{remarks}"></div>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary">Update Status</button>
-            </form>
+                    <button type="submit" class="btn btn-primary">Update Status</button>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <div th:if="${complaint.status.name() == 'APPROVED' or complaint.status.name() == 'REJECTED'}"
-         class="alert alert-info">
-        This complaint has been <strong th:text="${complaint.status.displayName}"></strong> and cannot be updated further.
-    </div>
+        <div th:if="${complaint.status.name() == 'APPROVED' or complaint.status.name() == 'REJECTED'}"
+            class="alert alert-info">
+            This complaint has been <strong th:text="${complaint.status.displayName}"></strong> and cannot be updated
+            further.
+        </div>
 
-    <!-- Status History -->
-    <div class="card" th:if="${statusHistory != null and !statusHistory.isEmpty()}">
-        <div class="card-header">Status History</div>
-        <div class="card-body">
-            <div class="timeline">
-                <div class="timeline-item" th:each="history : ${statusHistory}">
-                    <div class="time">
-                        <span th:text="${#temporals.format(history.changedAt, 'dd MMM yyyy, hh:mm a')}"></span>
-                        <span th:if="${history.changedBy}" style="margin-left:0.5rem;color:var(--text-muted);">
-                            by <span th:text="${history.changedBy}"></span>
-                        </span>
-                    </div>
-                    <div class="content">
-                        <span th:if="${history.oldStatus != null}">
-                            <span th:text="${history.oldStatus.displayName}"></span> &#8594;
-                        </span>
-                        <span th:class="'badge badge-' + ${history.newStatus.name().toLowerCase().replace('_', '-')}"
-                              th:text="${history.newStatus.displayName}"></span>
-                        <span th:if="${history.remarks}" style="display:block;margin-top:0.25rem;color:var(--text-muted);"
-                              th:text="${history.remarks}"></span>
+        <!-- Status History -->
+        <div class="card" th:if="${statusHistory != null and !statusHistory.isEmpty()}">
+            <div class="card-header">Status History</div>
+            <div class="card-body">
+                <div class="timeline">
+                    <div class="timeline-item" th:each="history : ${statusHistory}">
+                        <div class="time">
+                            <span th:text="${#temporals.format(history.changedAt, 'dd MMM yyyy, hh:mm a')}"></span>
+                            <span th:if="${history.changedBy}" style="margin-left:0.5rem;color:var(--text-muted);">
+                                by <span th:text="${history.changedBy}"></span>
+                            </span>
+                        </div>
+                        <div class="content">
+                            <span th:if="${history.oldStatus != null}">
+                                <span th:text="${history.oldStatus.displayName}"></span> &#8594;
+                            </span>
+                            <span
+                                th:class="'badge badge-' + ${history.newStatus.name().toLowerCase().replace('_', '-')}"
+                                th:text="${history.newStatus.displayName}"></span>
+                            <span th:if="${history.remarks}"
+                                style="display:block;margin-top:0.25rem;color:var(--text-muted);"
+                                th:text="${history.remarks}"></span>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-</div>
 
-<footer class="footer">
-    <p>&copy; 2026 Tenant Complaint Management System.</p>
-</footer>
+    <footer class="footer">
+        <p>&copy; 2026 Tenant Complaint Management System.</p>
+    </footer>
 
 </body>
+
 </html>
