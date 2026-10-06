@@ -1,4 +1,4 @@
-```java
+
 package com.tenantcomplaint.selenium;
 
 import org.junit.jupiter.api.*;
@@ -417,4 +417,4 @@ public class SeleniumTest {
         }
     }
 }
-```
+
