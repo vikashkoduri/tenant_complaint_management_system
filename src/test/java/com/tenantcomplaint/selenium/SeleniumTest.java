@@ -1,3 +1,4 @@
+```java
 package com.tenantcomplaint.selenium;
 
 import org.junit.jupiter.api.*;
@@ -53,7 +54,7 @@ public class SeleniumTest {
 
     @AfterEach
     void screenshotOnFailure(TestInfo testInfo) {
-        // Screenshot is taken in the catch block if needed
+        // Screenshots are taken in the catch block if needed
     }
 
     private void takeScreenshot(String name) {
@@ -61,7 +62,10 @@ public class SeleniumTest {
             File screenshot = ((TakesScreenshot) driver).getScreenshotAs(OutputType.FILE);
             Path targetDir = Paths.get("target", "selenium-screenshots");
             Files.createDirectories(targetDir);
-            Files.copy(screenshot.toPath(), targetDir.resolve(name + ".png"));
+            Files.copy(
+                    screenshot.toPath(),
+                    targetDir.resolve(name + ".png")
+            );
         } catch (IOException e) {
             System.err.println("Failed to save screenshot: " + e.getMessage());
         }
@@ -74,35 +78,63 @@ public class SeleniumTest {
         try {
             driver.get(baseUrl + "/complaints/submit");
 
-            // Fill in the form
-            driver.findElement(By.id("tenantName")).sendKeys("John Doe");
-            driver.findElement(By.id("email")).sendKeys("john.selenium@example.com");
-            driver.findElement(By.id("phoneNumber")).sendKeys("9876543210");
-            driver.findElement(By.id("propertyInfo")).sendKeys("Flat 302, Block A");
+            driver.findElement(By.id("tenantName"))
+                    .sendKeys("John Doe");
 
-            new Select(driver.findElement(By.id("category"))).selectByValue("WATER_LEAKAGE");
-            new Select(driver.findElement(By.id("priority"))).selectByValue("HIGH");
+            driver.findElement(By.id("email"))
+                    .sendKeys("john.selenium@example.com");
 
-            driver.findElement(By.id("title")).sendKeys("Water leak in bathroom ceiling");
-            driver.findElement(By.id("description")).sendKeys(
-                    "There is a constant water leak in the bathroom ceiling causing damage to the walls and floor tiles.");
+            driver.findElement(By.id("phoneNumber"))
+                    .sendKeys("9876543210");
 
-            // Submit
-            driver.findElement(By.cssSelector("button[type='submit']")).click();
+            driver.findElement(By.id("propertyInfo"))
+                    .sendKeys("Flat 302, Block A");
 
-            // Verify success page
+            new Select(driver.findElement(By.id("category")))
+                    .selectByValue("WATER_LEAKAGE");
+
+            new Select(driver.findElement(By.id("priority")))
+                    .selectByValue("HIGH");
+
+            driver.findElement(By.id("title"))
+                    .sendKeys("Water leak in bathroom ceiling");
+
+            driver.findElement(By.id("description"))
+                    .sendKeys(
+                            "There is a constant water leak in the bathroom ceiling " +
+                            "causing damage to the walls and floor tiles."
+                    );
+
+            driver.findElement(By.cssSelector("button[type='submit']"))
+                    .click();
+
             wait.until(ExpectedConditions.urlContains("/complaints/success/"));
 
-            WebElement refElement = driver.findElement(By.cssSelector(".detail-item .value"));
-            submittedReferenceId = refElement.getText().trim();
-            assertNotNull(submittedReferenceId);
-            assertTrue(submittedReferenceId.startsWith("COMP-"), "Reference ID should start with COMP-");
+            WebElement refElement = driver.findElement(
+                    By.cssSelector(".detail-item .value")
+            );
 
-            // Verify success message
+            submittedReferenceId = refElement.getText().trim();
+
+            assertNotNull(
+                    submittedReferenceId,
+                    "Reference ID should not be null"
+            );
+
+            assertTrue(
+                    submittedReferenceId.startsWith("COMP-"),
+                    "Reference ID should start with COMP-"
+            );
+
             String pageSource = driver.getPageSource();
-            assertTrue(pageSource.contains("Complaint Submitted Successfully"));
+
+            assertTrue(
+                    pageSource.contains("Complaint Submitted Successfully"),
+                    "Success message should be displayed"
+            );
 
             takeScreenshot("test1_submit_success");
+
         } catch (Exception e) {
             takeScreenshot("test1_submit_failure");
             throw e;
@@ -116,18 +148,31 @@ public class SeleniumTest {
         try {
             driver.get(baseUrl + "/complaints/submit");
 
-            // Submit empty form
-            driver.findElement(By.cssSelector("button[type='submit']")).click();
+            driver.findElement(By.cssSelector("button[type='submit']"))
+                    .click();
 
-            // Wait for validation errors to appear
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".form-error")));
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(".form-error")
+                    )
+            );
 
-            // Verify validation error messages are shown
-            var errors = driver.findElements(By.cssSelector(".form-error"));
-            assertFalse(errors.isEmpty(), "Validation errors should be displayed");
-            assertTrue(errors.size() >= 3, "Multiple validation errors should appear");
+            var errors = driver.findElements(
+                    By.cssSelector(".form-error")
+            );
+
+            assertFalse(
+                    errors.isEmpty(),
+                    "Validation errors should be displayed"
+            );
+
+            assertTrue(
+                    errors.size() >= 3,
+                    "Multiple validation errors should appear"
+            );
 
             takeScreenshot("test2_validation_errors");
+
         } catch (Exception e) {
             takeScreenshot("test2_validation_failure");
             throw e;
@@ -139,26 +184,43 @@ public class SeleniumTest {
     @DisplayName("TEST 3: Tenant tracks a submitted complaint")
     void testTrackComplaint() {
         try {
-            assertNotNull(submittedReferenceId, "Reference ID from Test 1 must be available");
+            assertNotNull(
+                    submittedReferenceId,
+                    "Reference ID from Test 1 must be available"
+            );
 
             driver.get(baseUrl + "/complaints/track");
 
-            // Enter tracking info
-            driver.findElement(By.id("referenceId")).sendKeys(submittedReferenceId);
-            driver.findElement(By.id("trackEmail")).sendKeys("john.selenium@example.com");
+            driver.findElement(By.id("referenceId"))
+                    .sendKeys(submittedReferenceId);
 
-            // Submit tracking form
-            driver.findElement(By.cssSelector("button[type='submit']")).click();
+            driver.findElement(By.id("trackEmail"))
+                    .sendKeys("john.selenium@example.com");
 
-            // Verify complaint status page loads
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".detail-grid")));
+            driver.findElement(By.cssSelector("button[type='submit']"))
+                    .click();
+
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(".detail-grid")
+                    )
+            );
 
             String pageSource = driver.getPageSource();
-            assertTrue(pageSource.contains(submittedReferenceId), "Reference ID should be displayed");
-            assertTrue(pageSource.contains("SUBMITTED") || pageSource.contains("Submitted"),
-                    "Status should be shown");
+
+            assertTrue(
+                    pageSource.contains(submittedReferenceId),
+                    "Reference ID should be displayed"
+            );
+
+            assertTrue(
+                    pageSource.contains("SUBMITTED") ||
+                    pageSource.contains("Submitted"),
+                    "Status should be shown"
+            );
 
             takeScreenshot("test3_track_success");
+
         } catch (Exception e) {
             takeScreenshot("test3_track_failure");
             throw e;
@@ -172,31 +234,67 @@ public class SeleniumTest {
         try {
             driver.get(baseUrl + "/login");
 
-            // Login
-            driver.findElement(By.id("username")).sendKeys("admin@tenant.com");
-            driver.findElement(By.id("password")).sendKeys("admin123");
-            driver.findElement(By.cssSelector("button[type='submit']")).click();
+            driver.findElement(By.id("username"))
+                    .sendKeys("admin@tenant.com");
 
-            // Wait for dashboard
-            wait.until(ExpectedConditions.urlContains("/reviewer/dashboard"));
+            driver.findElement(By.id("password"))
+                    .sendKeys("admin123");
 
-            // Verify dashboard loaded
+            driver.findElement(By.cssSelector("button[type='submit']"))
+                    .click();
+
+            wait.until(
+                    ExpectedConditions.urlContains(
+                            "/reviewer/dashboard"
+                    )
+            );
+
             String pageSource = driver.getPageSource();
-            assertTrue(pageSource.contains("Reviewer Dashboard"), "Dashboard should be visible");
-            assertTrue(pageSource.contains(submittedReferenceId) || pageSource.contains("COMP-"),
-                    "Complaints should be listed");
 
-            // Click on first complaint View button
-            WebElement viewButton = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.cssSelector("table tbody tr:first-child a.btn")));
+            assertTrue(
+                    pageSource.contains("Reviewer Dashboard"),
+                    "Dashboard should be visible"
+            );
+
+            assertTrue(
+                    pageSource.contains(submittedReferenceId) ||
+                    pageSource.contains("COMP-"),
+                    "Complaints should be listed"
+            );
+
+            /*
+             * Open the complaint created in Test 1.
+             * This is safer than always opening the first complaint.
+             */
+            WebElement viewButton = wait.until(
+                    ExpectedConditions.elementToBeClickable(
+                            By.xpath(
+                                    "//table//tbody//tr[contains(.,'" +
+                                    submittedReferenceId +
+                                    "')]//a[contains(@class,'btn')]"
+                            )
+                    )
+            );
+
             viewButton.click();
 
-            // Verify complaint detail page loads
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".detail-grid")));
-            assertTrue(driver.getPageSource().contains("Water leak"),
-                    "Complaint details should be shown");
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(".detail-grid")
+                    )
+            );
+
+            /*
+             * Check the reference ID instead of relying only
+             * on the complaint title text.
+             */
+            assertTrue(
+                    driver.getPageSource().contains(submittedReferenceId),
+                    "Complaint details should be shown"
+            );
 
             takeScreenshot("test4_reviewer_view");
+
         } catch (Exception e) {
             takeScreenshot("test4_reviewer_failure");
             throw e;
@@ -208,44 +306,115 @@ public class SeleniumTest {
     @DisplayName("TEST 5: Reviewer approves complaint and status is updated")
     void testReviewerApproveComplaint() {
         try {
-            // Navigate to dashboard first
-            driver.get(baseUrl + "/reviewer/dashboard");
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector("table")));
+            assertNotNull(
+                    submittedReferenceId,
+                    "Reference ID from Test 1 must be available"
+            );
 
-            // Click View on first complaint
-            WebElement viewButton = wait.until(ExpectedConditions.elementToBeClickable(
-                    By.cssSelector("table tbody tr:first-child a.btn")));
+            driver.get(baseUrl + "/reviewer/dashboard");
+
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector("table")
+                    )
+            );
+
+            /*
+             * Find the same complaint created in Test 1.
+             * Do not simply select the first complaint.
+             */
+            WebElement viewButton = wait.until(
+                    ExpectedConditions.elementToBeClickable(
+                            By.xpath(
+                                    "//table//tbody//tr[contains(.,'" +
+                                    submittedReferenceId +
+                                    "')]//a[contains(@class,'btn')]"
+                            )
+                    )
+            );
+
             viewButton.click();
 
-            // Wait for detail page
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.id("status")));
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.id("status")
+                    )
+            );
 
-            // First: change status to UNDER_REVIEW
-            new Select(driver.findElement(By.id("status"))).selectByValue("UNDER_REVIEW");
-            driver.findElement(By.id("remarks")).sendKeys("Taking this complaint for review");
-            driver.findElement(By.cssSelector("form button[type='submit']")).click();
+            /*
+             * The dropdown displays:
+             * Under Review
+             * Approved
+             * Rejected
+             *
+             * Therefore select by visible text instead of
+             * selectByValue().
+             */
+            new Select(driver.findElement(By.id("status")))
+                    .selectByVisibleText("Under Review");
 
-            // Wait for page refresh
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".alert-success")));
-            assertTrue(driver.getPageSource().contains("updated successfully"));
+            driver.findElement(By.id("remarks"))
+                    .sendKeys("Taking this complaint for review");
 
-            // Now approve it
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.id("status")));
-            new Select(driver.findElement(By.id("status"))).selectByValue("APPROVED");
-            driver.findElement(By.id("remarks")).clear();
-            driver.findElement(By.id("remarks")).sendKeys("Issue has been resolved. Approving complaint.");
-            driver.findElement(By.cssSelector("form button[type='submit']")).click();
+            driver.findElement(
+                    By.cssSelector("form button[type='submit']")
+            ).click();
 
-            // Verify approval
-            wait.until(ExpectedConditions.presenceOfElementLocated(By.cssSelector(".alert-success")));
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(".alert-success")
+                    )
+            );
+
+            assertTrue(
+                    driver.getPageSource().contains("updated successfully"),
+                    "Update success message should be displayed"
+            );
+
+            /*
+             * Select Approved after the complaint is under review.
+             */
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.id("status")
+                    )
+            );
+
+            new Select(driver.findElement(By.id("status")))
+                    .selectByVisibleText("Approved");
+
+            driver.findElement(By.id("remarks"))
+                    .clear();
+
+            driver.findElement(By.id("remarks"))
+                    .sendKeys(
+                            "Issue has been resolved. Approving complaint."
+                    );
+
+            driver.findElement(
+                    By.cssSelector("form button[type='submit']")
+            ).click();
+
+            wait.until(
+                    ExpectedConditions.presenceOfElementLocated(
+                            By.cssSelector(".alert-success")
+                    )
+            );
+
             String pageSource = driver.getPageSource();
-            assertTrue(pageSource.contains("APPROVED") || pageSource.contains("Approved"),
-                    "Status should show APPROVED");
+
+            assertTrue(
+                    pageSource.contains("APPROVED") ||
+                    pageSource.contains("Approved"),
+                    "Status should show APPROVED"
+            );
 
             takeScreenshot("test5_approve_success");
+
         } catch (Exception e) {
             takeScreenshot("test5_approve_failure");
             throw e;
         }
     }
 }
+```
