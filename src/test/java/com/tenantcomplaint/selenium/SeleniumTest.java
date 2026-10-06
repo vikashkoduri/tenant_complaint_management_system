@@ -20,7 +20,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 public class SeleniumTest {
 
-```
 private static WebDriver driver;
 private static WebDriverWait wait;
 private static String baseUrl;
