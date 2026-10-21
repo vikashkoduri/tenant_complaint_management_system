@@ -16,7 +16,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout') {
             steps {
                 checkout scm
@@ -60,69 +59,89 @@ pipeline {
 
             steps {
                 script {
-                    // Ensure the log directory exists.
                     bat '''
                         @echo off
                         if not exist target mkdir target
                         if exist target\\app-server.log del /q target\\app-server.log
+                        if exist wait-for-app.ps1 del /q wait-for-app.ps1
                     '''
 
-                    // Start the application in the background.
+                    // Start Spring Boot in the background.
                     bat '''
                         @echo off
                         start "" /B cmd /c "mvn spring-boot:run -Dspring-boot.run.profiles=test -Dspring-boot.run.useTestClasspath=true > target\\app-server.log 2>&1"
                     '''
 
-                    // Wait indefinitely for the application to become ready.
-                    // There is no fixed 120-second timeout.
+                    // Use a separate PowerShell file to avoid CMD quoting errors.
+                    writeFile file: 'wait-for-app.ps1', text: '''
+$ErrorActionPreference = 'Continue'
+$uri = 'http://localhost:8080/login'
+$logFile = 'target\\app-server.log'
+
+Write-Host "Waiting for application startup. No fixed 120-second timeout."
+
+while ($true) {
+    try {
+        $response = Invoke-WebRequest `
+            -Uri $uri `
+            -UseBasicParsing `
+            -TimeoutSec 5 `
+            -MaximumRedirection 5
+
+        if ([int]$response.StatusCode -ge 200 -and
+            [int]$response.StatusCode -lt 400) {
+            Write-Host "Application is ready."
+            exit 0
+        }
+    }
+    catch {
+        $statusCode = 0
+
+        try {
+            if ($_.Exception.Response -and
+                $_.Exception.Response.StatusCode) {
+                $statusCode = [int]$_.Exception.Response.StatusCode
+            }
+        } catch {}
+
+        if ($statusCode -ge 200 -and $statusCode -lt 400) {
+            Write-Host "Application is ready."
+            exit 0
+        }
+    }
+
+    if (Test-Path $logFile) {
+        $log = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
+
+        if ($log -match 'APPLICATION FAILED TO START|Unable to start web server|Port 8080 was already in use') {
+            Write-Host 'Spring Boot startup failure detected.'
+            Get-Content $logFile
+            exit 1
+        }
+    }
+
+    Write-Host "Application is not ready. Retrying in 10 seconds..."
+    Start-Sleep -Seconds 10
+}
+'''
+
                     bat '''
                         @echo off
-                        powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-                        "$ErrorActionPreference = 'Continue'; ^
-                        Write-Host 'Waiting for application startup...'; ^
-                        while ($true) { ^
-                            try { ^
-                                $response = Invoke-WebRequest -Uri 'http://localhost:8080/login' -UseBasicParsing -TimeoutSec 5 -MaximumRedirection 5; ^
-                                if ([int]$response.StatusCode -ge 200 -and [int]$response.StatusCode -lt 400) { ^
-                                    Write-Host 'Application is ready.'; ^
-                                    exit 0; ^
-                                } ^
-                            } catch { ^
-                                $status = 0; ^
-                                if ($_.Exception.Response) { ^
-                                    $status = [int]$_.Exception.Response.StatusCode; ^
-                                }; ^
-                                if ($status -ge 200 -and $status -lt 400) { ^
-                                    Write-Host 'Application is ready.'; ^
-                                    exit 0; ^
-                                }; ^
-                            }; ^
-                            if (Test-Path 'target\\app-server.log') { ^
-                                $log = Get-Content 'target\\app-server.log' -Raw -ErrorAction SilentlyContinue; ^
-                                if ($log -match 'APPLICATION FAILED TO START|BUILD FAILURE|Unable to start web server|Port 8080 was already in use') { ^
-                                    Write-Host 'Application startup failure detected. Server log follows:'; ^
-                                    Get-Content 'target\\app-server.log'; ^
-                                    exit 1; ^
-                                }; ^
-                            }; ^
-                            Write-Host ('Application is not ready yet. Retrying at ' + (Get-Date -Format 'HH:mm:ss')); ^
-                            Start-Sleep -Seconds 10; ^
-                        }"
+                        powershell -NoProfile -ExecutionPolicy Bypass -File wait-for-app.ps1
                         if errorlevel 1 (
-                            echo Application startup failed.
+                            echo Application startup check failed.
                             if exist target\\app-server.log type target\\app-server.log
                             exit /b 1
                         )
                     '''
 
-                    // Execute Selenium integration tests only after readiness.
+                    // Run Selenium after the application becomes available.
                     bat 'mvn failsafe:integration-test failsafe:verify -Dapp.base.url=%APP_URL%'
                 }
             }
 
             post {
                 always {
-                    // Display application logs if the stage failed.
                     script {
                         if (currentBuild.currentResult == 'FAILURE') {
                             bat '''
@@ -137,11 +156,10 @@ pipeline {
                         }
                     }
 
-                    // Stop the application listening on port 8080.
+                    // Stop the process listening on port 8080.
                     bat '''
                         @echo off
-                        powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-                        "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0"
+                        powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0"
                     '''
 
                     junit allowEmptyResults: true,
@@ -166,6 +184,7 @@ pipeline {
                     )
                 ]) {
                     bat '''
+                        @echo off
                         docker build -t "%DOCKER_USER%/%IMAGE_NAME%:%IMAGE_TAG%" .
                         if errorlevel 1 exit /b 1
 
@@ -187,7 +206,7 @@ pipeline {
                 ]) {
                     bat '''
                         @echo off
-                        powershell -NoProfile -Command "$env:DOCKER_PASSWORD | docker login --username $env:DOCKER_USER --password-stdin"
+                        powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:DOCKER_PASSWORD | docker login --username $env:DOCKER_USER --password-stdin"
                         if errorlevel 1 exit /b 1
 
                         docker push "%DOCKER_USER%/%IMAGE_NAME%:%IMAGE_TAG%"
@@ -225,7 +244,7 @@ pipeline {
         }
 
         failure {
-            echo 'Pipeline failed. Check the logs of the failed stage.'
+            echo 'Pipeline failed. Check the failed stage logs.'
         }
 
         always {
