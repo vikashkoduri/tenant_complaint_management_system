@@ -167,9 +167,12 @@ pipeline {
         }
 
         stage('Selenium Tests') {
+            environment {
+                JENKINS_NODE_COOKIE = 'dontKillMe'
+            }
             steps {
                 // Start the Spring Boot application in the background
-                bat 'start /B mvn spring-boot:run -Dspring-boot.run.profiles=test > target\\app-server.log 2>&1'
+                bat 'start "" /B mvn spring-boot:run -Dspring-boot.run.profiles=test -Dspring-boot.run.useTestClasspath=true > target\\app-server.log 2>&1'
 
                 // Wait for the application to be ready (up to 120 seconds)
                 bat '''
@@ -177,7 +180,8 @@ pipeline {
                     set RETRIES=0
                     :LOOP
                     if %RETRIES% GEQ 24 (
-                        echo Application failed to start within 120 seconds
+                        echo Application failed to start within 120 seconds. Showing app-server.log:
+                        if exist target\\app-server.log type target\\app-server.log
                         exit /b 1
                     )
                     curl -s -o nul -w "%%{http_code}" http://localhost:8080/actuator/health | findstr "200" >nul 2>&1
@@ -186,7 +190,7 @@ pipeline {
                         goto :RUN_TESTS
                     )
                     echo Waiting for application to start... attempt %RETRIES%
-                    timeout /t 5 /nobreak >nul
+                    ping -n 6 127.0.0.1 >nul
                     set /a RETRIES=%RETRIES%+1
                     goto :LOOP
                     :RUN_TESTS
@@ -198,7 +202,7 @@ pipeline {
             post {
                 always {
                     // Stop the Spring Boot application
-                    bat 'powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue"'
+                    bat 'powershell -Command "Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0"'
                     junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
                     archiveArtifacts artifacts: 'target/selenium-screenshots/*.png', allowEmptyArchive: true
                 }
