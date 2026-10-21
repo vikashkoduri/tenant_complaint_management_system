@@ -30,7 +30,8 @@ pipeline {
 
         stage('Unit Test') {
             steps {
-                bat 'mvn test'
+                // Run unit tests without starting SeleniumTest prematurely.
+                bat 'mvn test "-Dtest=!SeleniumTest"'
             }
             post {
                 always {
@@ -72,49 +73,53 @@ pipeline {
                         start "" /B cmd /c "mvn spring-boot:run -Dspring-boot.run.profiles=test -Dspring-boot.run.useTestClasspath=true > target\\app-server.log 2>&1"
                     '''
 
-                    // Use a separate PowerShell file to avoid CMD quoting errors.
+                    // Write a separate PowerShell script.
+                    // No CMD caret characters are used inside PowerShell.
                     writeFile file: 'wait-for-app.ps1', text: '''
 $ErrorActionPreference = 'Continue'
 $uri = 'http://localhost:8080/login'
 $logFile = 'target\\app-server.log'
 
-Write-Host "Waiting for application startup. No fixed 120-second timeout."
+Write-Host "Waiting for the application to start."
+Write-Host "Checking: $uri"
+Write-Host "There is no fixed 120-second timeout."
 
 while ($true) {
-    try {
-        $response = Invoke-WebRequest `
-            -Uri $uri `
-            -UseBasicParsing `
-            -TimeoutSec 5 `
-            -MaximumRedirection 5
+    $ready = $false
 
-        if ([int]$response.StatusCode -ge 200 -and
-            [int]$response.StatusCode -lt 400) {
-            Write-Host "Application is ready."
-            exit 0
+    try {
+        $response = Invoke-WebRequest -Uri $uri -UseBasicParsing -TimeoutSec 5
+        $statusCode = [int]$response.StatusCode
+
+        if ($statusCode -ge 200 -and $statusCode -lt 400) {
+            $ready = $true
         }
     }
     catch {
-        $statusCode = 0
-
         try {
-            if ($_.Exception.Response -and
-                $_.Exception.Response.StatusCode) {
+            if ($_.Exception.Response -and $_.Exception.Response.StatusCode) {
                 $statusCode = [int]$_.Exception.Response.StatusCode
-            }
-        } catch {}
 
-        if ($statusCode -ge 200 -and $statusCode -lt 400) {
-            Write-Host "Application is ready."
-            exit 0
+                if ($statusCode -ge 200 -and $statusCode -lt 400) {
+                    $ready = $true
+                }
+            }
         }
+        catch {
+            # The application is not reachable yet.
+        }
+    }
+
+    if ($ready) {
+        Write-Host "Application is ready. Starting Selenium tests."
+        exit 0
     }
 
     if (Test-Path $logFile) {
         $log = Get-Content $logFile -Raw -ErrorAction SilentlyContinue
 
         if ($log -match 'APPLICATION FAILED TO START|Unable to start web server|Port 8080 was already in use') {
-            Write-Host 'Spring Boot startup failure detected.'
+            Write-Host "Spring Boot startup error detected."
             Get-Content $logFile
             exit 1
         }
@@ -125,9 +130,11 @@ while ($true) {
 }
 '''
 
+                    // Execute the script as a file, not as an inline command.
                     bat '''
                         @echo off
-                        powershell -NoProfile -ExecutionPolicy Bypass -File wait-for-app.ps1
+                        powershell.exe -NoProfile -ExecutionPolicy Bypass -File wait-for-app.ps1
+
                         if errorlevel 1 (
                             echo Application startup check failed.
                             if exist target\\app-server.log type target\\app-server.log
@@ -135,7 +142,7 @@ while ($true) {
                         )
                     '''
 
-                    // Run Selenium after the application becomes available.
+                    // Run Selenium after the application responds.
                     bat 'mvn failsafe:integration-test failsafe:verify -Dapp.base.url=%APP_URL%'
                 }
             }
@@ -156,10 +163,10 @@ while ($true) {
                         }
                     }
 
-                    // Stop the process listening on port 8080.
+                    // Stop the application listening on port 8080.
                     bat '''
                         @echo off
-                        powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0"
+                        powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 8080 -State Listen -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; exit 0"
                     '''
 
                     junit allowEmptyResults: true,
@@ -206,7 +213,7 @@ while ($true) {
                 ]) {
                     bat '''
                         @echo off
-                        powershell -NoProfile -ExecutionPolicy Bypass -Command "$env:DOCKER_PASSWORD | docker login --username $env:DOCKER_USER --password-stdin"
+                        powershell.exe -NoProfile -Command "$env:DOCKER_PASSWORD | docker login --username $env:DOCKER_USER --password-stdin"
                         if errorlevel 1 exit /b 1
 
                         docker push "%DOCKER_USER%/%IMAGE_NAME%:%IMAGE_TAG%"
