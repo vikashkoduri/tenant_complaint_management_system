@@ -168,10 +168,42 @@ pipeline {
 
         stage('Selenium Tests') {
             steps {
+                // Start the Spring Boot application in the background
+                bat 'start /B mvn spring-boot:run -Dspring-boot.run.profiles=test > target\\app-server.log 2>&1'
+
+                // Wait for the application to be ready (up to 120 seconds)
+                bat '''
+                    @echo off
+                    set RETRIES=0
+                    :LOOP
+                    if %RETRIES% GEQ 24 (
+                        echo Application failed to start within 120 seconds
+                        exit /b 1
+                    )
+                    curl -s -o nul -w "%%{http_code}" http://localhost:8080/actuator/health | findstr "200" >nul 2>&1
+                    if %ERRORLEVEL% EQU 0 (
+                        echo Application is ready
+                        goto :RUN_TESTS
+                    )
+                    echo Waiting for application to start... attempt %RETRIES%
+                    timeout /t 5 /nobreak >nul
+                    set /a RETRIES=%RETRIES%+1
+                    goto :LOOP
+                    :RUN_TESTS
+                '''
+
+                // Run the Selenium tests
                 bat 'mvn failsafe:integration-test failsafe:verify -Dapp.base.url=http://localhost:8080'
             }
             post {
                 always {
+                    // Stop the Spring Boot application
+                    bat 'taskkill /F /FI "WINDOWTITLE eq mvn*" 2>nul & echo App cleanup done'
+                    junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
+                    archiveArtifacts artifacts: 'target/selenium-screenshots/*.png', allowEmptyArchive: true
+                }
+            }
+                    bat 'for /f "tokens=5" %%a in (\'netstat -aon ^| findstr ":8080" ^| findstr "LISTENING"\') do taskkill /F /PID %%a 2>nul || echo "App already stopped"'
                     junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
                     archiveArtifacts artifacts: 'target/selenium-screenshots/*.png', allowEmptyArchive: true
                 }

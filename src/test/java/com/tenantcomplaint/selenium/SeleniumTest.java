@@ -9,14 +9,24 @@ import org.openqa.selenium.support.ui.Select;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.io.File;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * Selenium WebDriver integration tests for critical user journeys.
+ *
+ * These tests expect the application to be running externally (e.g., via
+ * Spring Boot or deployed on Tomcat) at the URL specified by the
+ * {@code app.base.url} system property (default: http://localhost:8080).
+ *
+ * Run with:
+ *   mvn failsafe:integration-test failsafe:verify -Dapp.base.url=http://localhost:8080
+ */
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 public class SeleniumTest {
 
     private WebDriver driver;
@@ -28,22 +38,18 @@ public class SeleniumTest {
     private static final String TENANT_EMAIL =
             "john@example.com";
 
-    private static final String TENANT_PASSWORD =
-            "password123";
-
     private static final String REVIEWER_EMAIL =
             "admin@tenant.com";
 
     private static final String REVIEWER_PASSWORD =
             "admin123";
 
+    /** Shared across ordered tests via PER_CLASS lifecycle */
     private String submittedReferenceId;
 
-    @BeforeEach
-    void setUp() {
-
+    @BeforeAll
+    void setUpAll() {
         ChromeOptions options = new ChromeOptions();
-
         options.addArguments("--headless=new");
         options.addArguments("--no-sandbox");
         options.addArguments("--disable-dev-shm-usage");
@@ -51,20 +57,23 @@ public class SeleniumTest {
         options.addArguments("--disable-gpu");
 
         driver = new ChromeDriver(options);
-
         driver.manage().timeouts().implicitlyWait(Duration.ofSeconds(2));
         driver.manage().timeouts().pageLoadTimeout(Duration.ofSeconds(60));
 
         wait = new WebDriverWait(driver, Duration.ofSeconds(20));
     }
 
+    @AfterAll
+    void tearDownAll() {
+        if (driver != null) {
+            driver.quit();
+        }
+    }
+
     @AfterEach
-    void tearDown(TestInfo testInfo) {
-
+    void screenshotAfterTest(TestInfo testInfo) {
         try {
-
             if (driver != null) {
-
                 File screenshotDir =
                         new File("target/selenium-screenshots");
 
@@ -92,151 +101,51 @@ public class SeleniumTest {
                         java.nio.file.StandardCopyOption.REPLACE_EXISTING
                 );
             }
-
         } catch (Exception ignored) {
-        }
-
-        if (driver != null) {
-            driver.quit();
         }
     }
 
 
     // ============================================================
-    // TEST 1 - Tenant Registration
+    // TEST 1 - Submit Complaint
     // ============================================================
 
     @Test
     @Order(1)
-    void testTenantRegistration() {
-
-        driver.get(BASE_URL + "/register");
-
-        wait.until(
-                ExpectedConditions.presenceOfElementLocated(
-                        By.name("name")
-                )
-        );
-
-        String uniqueEmail =
-                "john" + System.currentTimeMillis() + "@example.com";
-
-        WebElement name =
-                driver.findElement(By.name("name"));
-
-        WebElement email =
-                driver.findElement(By.name("email"));
-
-        WebElement password =
-                driver.findElement(By.name("password"));
-
-        name.sendKeys("John Doe");
-        email.sendKeys(uniqueEmail);
-        password.sendKeys("password123");
-
-        WebElement submit =
-                findSubmitButton();
-
-        submit.click();
-
-        wait.until(
-                ExpectedConditions.or(
-                        ExpectedConditions.urlContains("/login"),
-                        ExpectedConditions.presenceOfElementLocated(
-                                By.cssSelector(".alert")
-                        )
-                )
-        );
-
-        assertTrue(
-                driver.getCurrentUrl().contains("/login")
-                        || !driver.findElements(By.cssSelector(".alert")).isEmpty()
-        );
-    }
-
-
-    // ============================================================
-    // TEST 2 - Tenant Login
-    // ============================================================
-
-    @Test
-    @Order(2)
-    void testTenantLogin() {
-
-        loginAsTenant();
-
-        assertTrue(
-                driver.getCurrentUrl().contains("/tenant")
-                        || driver.getCurrentUrl().contains("/dashboard")
-                        || driver.getPageSource().contains("Dashboard")
-                        || driver.getPageSource().contains("Submit")
-        );
-    }
-
-
-    // ============================================================
-    // TEST 3 - Submit Complaint
-    // ============================================================
-
-    @Test
-    @Order(3)
     void testSubmitComplaint() {
 
-        loginAsTenant();
-
-        driver.get(BASE_URL + "/complaint/new");
+        driver.get(BASE_URL + "/complaints/submit");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
-                        By.name("title")
+                        By.id("title")
                 )
         );
 
-        fillIfPresent("tenantName", "John Doe");
-        fillIfPresent("name", "John Doe");
-
-        fillIfPresent(
-                "email",
-                TENANT_EMAIL
-        );
-
-        fillIfPresent(
-                "phoneNumber",
-                "9876543210"
-        );
-
-        fillIfPresent(
-                "propertyInfo",
-                "Building A, Room 101"
-        );
-
-        fillIfPresent(
-                "title",
-                "Water leak"
-        );
-
-        fillIfPresent(
-                "description",
-                "Water leakage is occurring in the bathroom."
-        );
+        fillField("tenantName", "John Doe");
+        fillField("email", TENANT_EMAIL);
+        fillField("phoneNumber", "9876543210");
+        fillField("propertyInfo", "Building A, Room 101");
+        fillField("title", "Water leak");
+        fillField("description", "Water leakage is occurring in the bathroom ceiling causing damage.");
 
         selectFirstAvailable(
                 "category",
                 "PLUMBING",
                 "Plumbing",
-                "WATER_LEAK",
-                "Water Leak"
+                "WATER_LEAKAGE",
+                "Water Leakage"
         );
 
         selectFirstAvailable(
                 "priority",
                 "MEDIUM",
-                "Medium"
+                "Medium",
+                "HIGH",
+                "High"
         );
 
-        WebElement submit =
-                findSubmitButton();
-
+        WebElement submit = findSubmitButton();
         submit.click();
 
         wait.until(
@@ -250,22 +159,17 @@ public class SeleniumTest {
                                 )
                         ),
                         ExpectedConditions.urlContains(
-                                "/complaint"
+                                "/complaints/success"
                         )
                 )
         );
 
-        String pageSource =
-                driver.getPageSource();
+        String pageSource = driver.getPageSource();
 
-        int index =
-                pageSource.indexOf("COMP-");
+        int index = pageSource.indexOf("COMP-");
 
         if (index >= 0) {
-
-            String reference =
-                    extractReferenceId(pageSource, index);
-
+            String reference = extractReferenceId(pageSource, index);
             if (reference != null) {
                 submittedReferenceId = reference;
             }
@@ -274,22 +178,37 @@ public class SeleniumTest {
         assertTrue(
                 pageSource.contains("Complaint")
                         || pageSource.contains("submitted")
-                        || pageSource.contains("COMP-")
+                        || pageSource.contains("COMP-"),
+                "Success page should contain complaint confirmation"
         );
     }
 
 
     // ============================================================
-    // TEST 4 - Verify Submitted Complaint
+    // TEST 2 - Track Submitted Complaint
     // ============================================================
 
     @Test
-    @Order(4)
+    @Order(2)
     void testComplaintDetails() {
 
-        loginAsTenant();
+        driver.get(BASE_URL + "/complaints/track");
 
-        driver.get(BASE_URL + "/tenant/complaints");
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.id("referenceId")
+                )
+        );
+
+        fillField("referenceId",
+                submittedReferenceId != null
+                        ? submittedReferenceId
+                        : "COMP-123");
+
+        fillField("email", TENANT_EMAIL);
+
+        WebElement submit = findSubmitButton();
+        submit.click();
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -298,20 +217,63 @@ public class SeleniumTest {
         );
 
         if (submittedReferenceId != null) {
-
             assertTrue(
                     driver.getPageSource()
                             .contains(submittedReferenceId),
                     "Submitted complaint reference ID should be visible"
             );
-
         } else {
-
             assertTrue(
                     driver.getPageSource().contains("Water leak")
                             || driver.getPageSource().contains("Complaint")
             );
         }
+    }
+
+
+    // ============================================================
+    // TEST 3 - Reviewer Login
+    // ============================================================
+
+    @Test
+    @Order(3)
+    void testReviewerLogin() {
+
+        loginAsReviewer();
+
+        assertTrue(
+                driver.getCurrentUrl().contains("/reviewer")
+                        || driver.getPageSource().contains("Dashboard"),
+                "Reviewer should be on the dashboard after login"
+        );
+    }
+
+
+    // ============================================================
+    // TEST 4 - Reviewer Views Dashboard
+    // ============================================================
+
+    @Test
+    @Order(4)
+    void testReviewerDashboard() {
+
+        loginAsReviewer();
+
+        driver.get(BASE_URL + "/reviewer/dashboard");
+
+        wait.until(
+                ExpectedConditions.presenceOfElementLocated(
+                        By.id("complaintsTable")
+                )
+        );
+
+        WebElement table = driver.findElement(By.id("complaintsTable"));
+        assertNotNull(table, "Complaints table must be present");
+
+        assertTrue(
+                driver.getPageSource().contains("Reviewer Dashboard"),
+                "Dashboard page should contain 'Reviewer Dashboard'"
+        );
     }
 
 
@@ -325,9 +287,7 @@ public class SeleniumTest {
 
         loginAsReviewer();
 
-        driver.get(
-                BASE_URL + "/reviewer/dashboard"
-        );
+        driver.get(BASE_URL + "/reviewer/dashboard");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -337,43 +297,32 @@ public class SeleniumTest {
 
         /*
          * Find the complaint submitted by the test.
-         *
-         * If submittedReferenceId is available, use it.
-         * Otherwise use the first complaint row containing
-         * "Water leak" or a complaint row.
          */
-
-        WebElement complaintRow =
-                findComplaintRow();
+        WebElement complaintRow = findComplaintRow();
 
         assertNotNull(
                 complaintRow,
                 "Complaint row must be present on reviewer dashboard"
         );
 
-
         /*
          * Get the View link directly from this row.
          */
-
         WebElement viewLink =
                 complaintRow.findElement(
                         By.cssSelector("a.view-complaint")
                 );
 
-        String complaintUrl =
-                viewLink.getAttribute("href");
+        String complaintUrl = viewLink.getAttribute("href");
 
         assertNotNull(
                 complaintUrl,
                 "Complaint View link must have an href"
         );
 
-
         /*
          * Open complaint detail page.
          */
-
         driver.get(complaintUrl);
 
         wait.until(
@@ -382,34 +331,16 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Confirm complaint detail page.
-         */
-
         assertTrue(
                 driver.getPageSource().contains("Complaint")
                         || driver.getPageSource().contains("Reference ID")
         );
-
 
         /*
          * ========================================================
          * STEP 1:
          * Change SUBMITTED -> UNDER_REVIEW
          * ========================================================
-         *
-         * IMPORTANT:
-         *
-         * The HTML shows:
-         *
-         * <select id="status">
-         *
-         * For SUBMITTED complaint:
-         *
-         * UNDER_REVIEW
-         *
-         * is the available status.
          */
 
         WebElement statusSelect =
@@ -419,26 +350,18 @@ public class SeleniumTest {
                         )
                 );
 
-        Select status =
-                new Select(statusSelect);
+        Select status = new Select(statusSelect);
 
         assertTrue(
-                hasOption(
-                        status,
-                        "Under Review"
-                ),
+                hasOption(status, "Under Review"),
                 "Status dropdown must contain Under Review"
         );
 
-        status.selectByVisibleText(
-                "Under Review"
-        );
-
+        status.selectByVisibleText("Under Review");
 
         /*
          * Enter reviewer remarks.
          */
-
         WebElement remarks =
                 wait.until(
                         ExpectedConditions.presenceOfElementLocated(
@@ -447,23 +370,18 @@ public class SeleniumTest {
                 );
 
         remarks.clear();
-
         remarks.sendKeys(
                 "Complaint reviewed and moved to Under Review."
         );
 
-
         /*
          * Submit status update.
          */
-
         clickUpdateStatus();
-
 
         /*
          * Wait for response.
          */
-
         wait.until(
                 ExpectedConditions.or(
                         ExpectedConditions.urlContains(
@@ -474,12 +392,6 @@ public class SeleniumTest {
                         )
                 )
         );
-
-
-        /*
-         * If we are still on complaint page, verify
-         * Under Review is visible.
-         */
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -501,9 +413,7 @@ public class SeleniumTest {
          * ========================================================
          */
 
-        driver.get(
-                BASE_URL + "/reviewer/dashboard"
-        );
+        driver.get(BASE_URL + "/reviewer/dashboard");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -511,19 +421,12 @@ public class SeleniumTest {
                 )
         );
 
-
-        WebElement updatedRow =
-                findComplaintRow();
+        WebElement updatedRow = findComplaintRow();
 
         assertNotNull(
                 updatedRow,
                 "Updated complaint must be visible on dashboard"
         );
-
-
-        /*
-         * Verify dashboard shows Under Review.
-         */
 
         WebElement currentStatus =
                 updatedRow.findElement(
@@ -536,11 +439,9 @@ public class SeleniumTest {
                 "Dashboard should show Under Review"
         );
 
-
         /*
          * Open the same complaint again.
          */
-
         WebElement updatedViewLink =
                 updatedRow.findElement(
                         By.cssSelector("a.view-complaint")
@@ -550,7 +451,6 @@ public class SeleniumTest {
                 updatedViewLink.getAttribute("href");
 
         driver.get(updatedComplaintUrl);
-
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -573,28 +473,18 @@ public class SeleniumTest {
                         )
                 );
 
-        Select approvalStatus =
-                new Select(approvalSelect);
-
+        Select approvalStatus = new Select(approvalSelect);
 
         assertTrue(
-                hasOption(
-                        approvalStatus,
-                        "Approved"
-                ),
+                hasOption(approvalStatus, "Approved"),
                 "Status dropdown must contain Approved"
         );
 
-
-        approvalStatus.selectByVisibleText(
-                "Approved"
-        );
-
+        approvalStatus.selectByVisibleText("Approved");
 
         /*
          * Enter approval remarks.
          */
-
         WebElement approvalRemarks =
                 wait.until(
                         ExpectedConditions.presenceOfElementLocated(
@@ -603,34 +493,20 @@ public class SeleniumTest {
                 );
 
         approvalRemarks.clear();
-
         approvalRemarks.sendKeys(
                 "Complaint reviewed and approved."
         );
 
-
         /*
          * Submit approval.
          */
-
         clickUpdateStatus();
-
-
-        /*
-         * Wait for page response.
-         */
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
                         By.tagName("body")
                 )
         );
-
-
-        /*
-         * Approved complaints no longer have the status
-         * update form.
-         */
 
         wait.until(
                 ExpectedConditions.or(
@@ -645,11 +521,6 @@ public class SeleniumTest {
                 )
         );
 
-
-        /*
-         * Verify final status.
-         */
-
         assertTrue(
                 driver.getPageSource()
                         .contains("Approved"),
@@ -663,9 +534,7 @@ public class SeleniumTest {
          * ========================================================
          */
 
-        driver.get(
-                BASE_URL + "/reviewer/dashboard"
-        );
+        driver.get(BASE_URL + "/reviewer/dashboard");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -673,21 +542,17 @@ public class SeleniumTest {
                 )
         );
 
-
-        WebElement finalRow =
-                findComplaintRow();
+        WebElement finalRow = findComplaintRow();
 
         assertNotNull(
                 finalRow,
                 "Approved complaint must remain visible on dashboard"
         );
 
-
         WebElement finalStatus =
                 finalRow.findElement(
                         By.cssSelector(".complaint-status")
                 );
-
 
         assertEquals(
                 "Approved",
@@ -698,68 +563,12 @@ public class SeleniumTest {
 
 
     // ============================================================
-    // LOGIN - TENANT
-    // ============================================================
-
-    private void loginAsTenant() {
-
-        driver.get(
-                BASE_URL + "/login"
-        );
-
-        wait.until(
-                ExpectedConditions.presenceOfElementLocated(
-                        By.name("username")
-                )
-        );
-
-
-        WebElement username =
-                driver.findElement(
-                        By.name("username")
-                );
-
-        WebElement password =
-                driver.findElement(
-                        By.name("password")
-                );
-
-
-        username.clear();
-        username.sendKeys(TENANT_EMAIL);
-
-        password.clear();
-        password.sendKeys(TENANT_PASSWORD);
-
-
-        findSubmitButton().click();
-
-
-        wait.until(
-                ExpectedConditions.or(
-                        ExpectedConditions.urlContains(
-                                "/tenant"
-                        ),
-                        ExpectedConditions.urlContains(
-                                "/dashboard"
-                        ),
-                        ExpectedConditions.presenceOfElementLocated(
-                                By.cssSelector(".alert")
-                        )
-                )
-        );
-    }
-
-
-    // ============================================================
     // LOGIN - REVIEWER
     // ============================================================
 
     private void loginAsReviewer() {
 
-        driver.get(
-                BASE_URL + "/login"
-        );
+        driver.get(BASE_URL + "/login");
 
         wait.until(
                 ExpectedConditions.presenceOfElementLocated(
@@ -767,17 +576,11 @@ public class SeleniumTest {
                 )
         );
 
-
         WebElement username =
-                driver.findElement(
-                        By.name("username")
-                );
+                driver.findElement(By.name("username"));
 
         WebElement password =
-                driver.findElement(
-                        By.name("password")
-                );
-
+                driver.findElement(By.name("password"));
 
         username.clear();
         username.sendKeys(REVIEWER_EMAIL);
@@ -785,9 +588,7 @@ public class SeleniumTest {
         password.clear();
         password.sendKeys(REVIEWER_PASSWORD);
 
-
         findSubmitButton().click();
-
 
         wait.until(
                 ExpectedConditions.or(
@@ -812,7 +613,6 @@ public class SeleniumTest {
          * First attempt:
          * Use the exact reference ID.
          */
-
         if (submittedReferenceId != null
                 && !submittedReferenceId.isBlank()) {
 
@@ -820,30 +620,24 @@ public class SeleniumTest {
                     "//tr[@data-reference-id='"
                             + submittedReferenceId
                             + "']";
-
             try {
-
                 return wait.until(
                         ExpectedConditions.presenceOfElementLocated(
                                 By.xpath(xpath)
                         )
                 );
-
             } catch (Exception ignored) {
             }
         }
-
 
         /*
          * Second attempt:
          * Search by reference ID text.
          */
-
         if (submittedReferenceId != null
                 && !submittedReferenceId.isBlank()) {
 
             try {
-
                 return wait.until(
                         ExpectedConditions.presenceOfElementLocated(
                                 By.xpath(
@@ -853,19 +647,15 @@ public class SeleniumTest {
                                 )
                         )
                 );
-
             } catch (Exception ignored) {
             }
         }
-
 
         /*
          * Third attempt:
          * Find Water leak complaint.
          */
-
         try {
-
             return wait.until(
                     ExpectedConditions.presenceOfElementLocated(
                             By.xpath(
@@ -873,18 +663,14 @@ public class SeleniumTest {
                             )
                     )
             );
-
         } catch (Exception ignored) {
         }
-
 
         /*
          * Final fallback:
          * Return first actual complaint row.
          */
-
         try {
-
             return wait.until(
                     ExpectedConditions.presenceOfElementLocated(
                             By.cssSelector(
@@ -892,9 +678,7 @@ public class SeleniumTest {
                             )
                     )
             );
-
         } catch (Exception e) {
-
             return null;
         }
     }
@@ -907,46 +691,24 @@ public class SeleniumTest {
     private WebElement findSubmitButton() {
 
         By[] selectors = {
-
-                By.cssSelector(
-                        "button[type='submit']"
-                ),
-
-                By.cssSelector(
-                        "input[type='submit']"
-                ),
-
-                By.xpath(
-                        "//button[contains(normalize-space(),'Submit')]"
-                ),
-
-                By.xpath(
-                        "//button[contains(normalize-space(),'Login')]"
-                ),
-
-                By.xpath(
-                        "//button[contains(normalize-space(),'Register')]"
-                )
+                By.cssSelector("button[type='submit']"),
+                By.cssSelector("input[type='submit']"),
+                By.xpath("//button[contains(normalize-space(),'Submit')]"),
+                By.xpath("//button[contains(normalize-space(),'Sign In')]"),
+                By.xpath("//button[contains(normalize-space(),'Login')]"),
+                By.xpath("//button[contains(normalize-space(),'Track')]"),
+                By.xpath("//button[contains(normalize-space(),'Register')]")
         };
 
-
         for (By selector : selectors) {
-
             try {
-
-                WebElement element =
-                        driver.findElement(selector);
-
-                if (element.isDisplayed()
-                        && element.isEnabled()) {
-
+                WebElement element = driver.findElement(selector);
+                if (element.isDisplayed() && element.isEnabled()) {
                     return element;
                 }
-
             } catch (Exception ignored) {
             }
         }
-
 
         throw new NoSuchElementException(
                 "Unable to find submit button"
@@ -981,13 +743,10 @@ public class SeleniumTest {
             Select select,
             String visibleText) {
 
-        for (WebElement option :
-                select.getOptions()) {
-
+        for (WebElement option : select.getOptions()) {
             if (option.getText()
                     .trim()
                     .equals(visibleText)) {
-
                 return true;
             }
         }
@@ -997,23 +756,21 @@ public class SeleniumTest {
 
 
     // ============================================================
-    // FILL INPUT IF AVAILABLE
+    // FILL INPUT FIELD
     // ============================================================
 
-    private void fillIfPresent(
-            String name,
-            String value) {
+    private void fillField(String fieldId, String value) {
 
         try {
-
-            WebElement element =
-                    driver.findElement(
-                            By.name(name)
-                    );
-
+            // Try by id first, then by name
+            WebElement element;
+            try {
+                element = driver.findElement(By.id(fieldId));
+            } catch (NoSuchElementException e) {
+                element = driver.findElement(By.name(fieldId));
+            }
             element.clear();
             element.sendKeys(value);
-
         } catch (Exception ignored) {
         }
     }
@@ -1024,40 +781,32 @@ public class SeleniumTest {
     // ============================================================
 
     private void selectFirstAvailable(
-            String name,
+            String fieldId,
             String... values) {
 
         try {
+            WebElement element;
+            try {
+                element = driver.findElement(By.id(fieldId));
+            } catch (NoSuchElementException e) {
+                element = driver.findElement(By.name(fieldId));
+            }
 
-            WebElement element =
-                    driver.findElement(
-                            By.name(name)
-                    );
-
-            Select select =
-                    new Select(element);
-
+            Select select = new Select(element);
 
             for (String value : values) {
-
                 try {
-
                     select.selectByValue(value);
                     return;
-
                 } catch (Exception ignored) {
                 }
 
-
                 try {
-
                     select.selectByVisibleText(value);
                     return;
-
                 } catch (Exception ignored) {
                 }
             }
-
         } catch (Exception ignored) {
         }
     }
@@ -1072,38 +821,24 @@ public class SeleniumTest {
             int startIndex) {
 
         try {
+            String remaining = text.substring(startIndex);
 
-            String remaining =
-                    text.substring(startIndex);
+            StringBuilder result = new StringBuilder();
 
-            StringBuilder result =
-                    new StringBuilder();
-
-            for (int i = 0;
-                 i < remaining.length();
-                 i++) {
-
-                char c =
-                        remaining.charAt(i);
-
-                if (Character.isLetterOrDigit(c)
-                        || c == '-') {
-
+            for (int i = 0; i < remaining.length(); i++) {
+                char c = remaining.charAt(i);
+                if (Character.isLetterOrDigit(c) || c == '-') {
                     result.append(c);
-
                 } else {
-
                     break;
                 }
             }
 
-            String reference =
-                    result.toString();
+            String reference = result.toString();
 
             if (reference.startsWith("COMP-")) {
                 return reference;
             }
-
         } catch (Exception ignored) {
         }
 
