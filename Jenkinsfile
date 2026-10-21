@@ -198,12 +198,7 @@ pipeline {
             post {
                 always {
                     // Stop the Spring Boot application
-                    bat 'taskkill /F /FI "WINDOWTITLE eq mvn*" 2>nul & echo App cleanup done'
-                    junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
-                    archiveArtifacts artifacts: 'target/selenium-screenshots/*.png', allowEmptyArchive: true
-                }
-            }
-                    bat 'for /f "tokens=5" %%a in (\'netstat -aon ^| findstr ":8080" ^| findstr "LISTENING"\') do taskkill /F /PID %%a 2>nul || echo "App already stopped"'
+                    bat 'powershell -Command "Stop-Process -Id (Get-NetTCPConnection -LocalPort 8080 -ErrorAction SilentlyContinue).OwningProcess -Force -ErrorAction SilentlyContinue"'
                     junit allowEmptyResults: true, testResults: 'target/failsafe-reports/*.xml'
                     archiveArtifacts artifacts: 'target/selenium-screenshots/*.png', allowEmptyArchive: true
                 }
